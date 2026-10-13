@@ -28,17 +28,34 @@ async function authEnv(remoteUrl) {
   return env;
 }
 
-export function run(cwd, args, { env, timeout = 5 * 60 * 1000 } = {}) {
+// input: texto que se envía por stdin (p. ej. un parche para "git apply -").
+export function run(cwd, args, { env, timeout = 5 * 60 * 1000, input } = {}) {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, env: env || process.env, timeout, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = execFile('git', args, { cwd, env: env || process.env, timeout, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        const e = new Error((stderr || err.message).trim());
+        const e = new Error((stderr || stdout || err.message).trim());
         e.status = 400;
         return reject(e);
       }
       resolve({ stdout, stderr });
     });
+    if (input !== undefined) child.stdin.end(input);
   });
+}
+
+// Entorno para comandos que abrirían un editor (rebase/cherry-pick --continue): acepta el mensaje propuesto.
+export const noEditorEnv = () => ({ ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_TERMINAL_PROMPT: '0' });
+
+// Operación en curso que deja el repo a medias (merge, rebase, cherry-pick o revert con conflictos).
+export async function operation(cwd) {
+  let gitDir;
+  try { gitDir = path.resolve(cwd, (await run(cwd, ['rev-parse', '--git-dir'])).stdout.trim()); } catch { return null; }
+  const has = (f) => fs.existsSync(path.join(gitDir, f));
+  if (has('rebase-merge') || has('rebase-apply')) return 'rebase';
+  if (has('MERGE_HEAD')) return 'merge';
+  if (has('CHERRY_PICK_HEAD')) return 'cherry-pick';
+  if (has('REVERT_HEAD')) return 'revert';
+  return null;
 }
 
 export async function remoteUrl(cwd, remote = 'origin') {
