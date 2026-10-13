@@ -38,9 +38,9 @@ export default function Login({ auth, onLoggedIn }) {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2 }}>
-      <Card sx={{ width: '100%', maxWidth: 520 }} variant="outlined">
-        <CardContent>
-          <Typography variant="h5" gutterBottom>Git Manager</Typography>
+      <Card sx={{ width: '100%', maxWidth: 520 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Typography variant="h4" gutterBottom><Box component="span" sx={{ color: 'primary.main' }}>Git</Box> Manager</Typography>
           <Typography color="text.secondary" sx={{ mb: 2 }}>Conéctate a tu instancia de GitLab.</Typography>
           <TextField label="URL de GitLab" fullWidth value={url} onChange={(e) => setUrl(e.target.value)} sx={{ mb: 2 }} />
           <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 2 }} variant="fullWidth">
