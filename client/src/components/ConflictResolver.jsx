@@ -128,7 +128,7 @@ export default function ConflictResolver({ repoId, file, onResolved, notify }) {
                   ))}
                 </ButtonGroup>
               </Stack>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) minmax(0, 1fr)' }, gap: 1 }}>
                 {sideBox(`Actual · ${p.conflict.oursLabel || 'HEAD'}`, p.conflict.ours, ours, choice[i] === 'ours' || choice[i]?.startsWith('both'))}
                 {sideBox(`Entrante · ${p.conflict.theirsLabel || 'otra rama'}`, p.conflict.theirs, theirs, choice[i] === 'theirs' || choice[i]?.startsWith('both'))}
               </Box>

@@ -95,7 +95,7 @@ export default function Compare({ repoId, initial, version, notify }) {
               {result.mergeBase ? <Typography variant="caption" color="text.secondary">Ancestro común: <Box component="span" sx={{ fontFamily: theme.typography.fontFamilyCode }}>{result.mergeBase}</Box></Typography>
                 : <Typography variant="caption" color="warning.main">Sin historia en común</Typography>}
             </Stack>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px 1fr' }, gap: 2, alignItems: 'start' }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: 2, alignItems: 'start' }}>
               <Stack spacing={2}>
                 <Paper variant="outlined" sx={{ maxHeight: 320, overflow: 'auto' }}>
                   <List dense disablePadding>

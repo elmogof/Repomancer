@@ -11,6 +11,7 @@ import { useNotify } from './Notify.jsx';
 const POLL = 30 * 1000;
 const EVENT = 'gm-autofetch';
 export const REPOS_REFRESH = 'gm-repos-refresh';
+export const AUTOFETCH_RUN = 'gm-autofetch-run'; // lo lanza la paleta de comandos
 let latest = null; // último estado conocido, compartido entre el vigilante y el botón
 
 const publish = (s) => { latest = s; window.dispatchEvent(new CustomEvent(EVENT, { detail: s })); };
@@ -111,6 +112,12 @@ export function AutoFetchButton() {
     } catch (e) { notify(e.message, 'error', { title: 'Fetch automático' }); }
     finally { setBusy(false); }
   };
+
+  useEffect(() => {
+    const on = () => runNow();
+    window.addEventListener(AUTOFETCH_RUN, on);
+    return () => window.removeEventListener(AUTOFETCH_RUN, on);
+  });
 
   if (!s) return null;
   const running = s.running || busy;

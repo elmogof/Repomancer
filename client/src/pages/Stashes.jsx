@@ -42,7 +42,7 @@ export default function Stashes({ repoId, act, onNew, version }) {
 
   if (!list) return <LinearProgress />;
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px 1fr' }, gap: 2, alignItems: 'start' }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: 2, alignItems: 'start' }}>
       <Paper variant="outlined">
         <List dense disablePadding>
           <ListSubheader sx={{ display: 'flex', alignItems: 'center' }}>

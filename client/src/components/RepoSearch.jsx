@@ -42,7 +42,7 @@ export default function RepoSearch() {
   return (
     <Autocomplete
       sx={{
-        width: { xs: 220, md: 340, lg: 420 }, mr: 2,
+        width: { xs: 150, sm: 220, md: 340, lg: 420 }, mr: { xs: 0.5, sm: 2 },
         // Autocomplete reduce el padding izquierdo a 6px; se amplía para que la lupa no quede pegada al borde.
         '& .MuiAutocomplete-inputRoot.MuiOutlinedInput-root.MuiInputBase-sizeSmall': { pl: 1.5 },
       }}

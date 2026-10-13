@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress,
@@ -24,6 +24,7 @@ import AddReposDialog from '../components/AddReposDialog.jsx';
 import RepoActions, { syncRepo } from '../components/RepoActions.jsx';
 import LabelsDialog, { labelColor } from '../components/LabelsDialog.jsx';
 import { REPOS_REFRESH } from '../components/AutoFetch.jsx';
+import { useCommands } from '../components/Commands.jsx';
 
 // Filtros rápidos por estado (excluyentes entre sí).
 const STATUS_FILTERS = [
@@ -64,6 +65,7 @@ export default function Repos() {
   const [bulk, setBulk] = useState(null);
   const notify = useNotify();
   const navigate = useNavigate();
+  const filterRef = useRef(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -176,6 +178,16 @@ export default function Repos() {
     load();
   };
 
+  useCommands('repos', () => [
+    { id: 'filter', group: 'Repositorios', title: 'Filtrar por nombre', keys: '/', run: () => filterRef.current?.focus() },
+    { id: 'add', group: 'Repositorios', title: 'Añadir repositorios existentes', keys: 'a', run: () => setAddOpen(true) },
+    { id: 'clone', group: 'Repositorios', title: 'Clonar repositorio', keys: 'n', run: () => setCloneOpen(true) },
+    { id: 'refresh', group: 'Repositorios', title: 'Actualizar la lista', keys: 'r', run: load },
+    { id: 'clear', group: 'Repositorios', title: 'Quitar filtros', run: () => { setFilter(''); setView({ status: 'all', favorites: false, labels: [] }); } },
+    ...STATUS_FILTERS.map((f) => ({ id: `status:${f.key}`, group: 'Repositorios · filtro', title: `Mostrar: ${f.label}`, run: () => setView((v) => ({ ...v, status: f.key })) })),
+    { id: 'favs', group: 'Repositorios · filtro', title: 'Mostrar solo favoritos', run: () => setView((v) => ({ ...v, favorites: !v.favorites })) },
+  ], [load]);
+
   const sortBy = (by) => setSort((s) => (s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: by === 'date' ? 'desc' : 'asc' }));
   const anyFilter = view.status !== 'all' || view.favorites || view.labels.length || filter.trim();
   const selectedRepos = repos.filter((r) => selected.has(r.id));
@@ -190,10 +202,10 @@ export default function Repos() {
     <Box>
       {/* La barra de selección se superpone a la cabecera (misma altura) para que la tabla no se desplace al seleccionar. */}
       <Box sx={{ position: 'relative', mb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>Repositorios locales</Typography>
           {repos.length > 0 && (
-            <TextField size="small" placeholder="Filtrar por nombre…" value={filter} onChange={(e) => setFilter(e.target.value)} sx={{ width: 260 }}
+            <TextField size="small" placeholder="Filtrar por nombre…  /" inputRef={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && e.target.blur()} sx={{ width: { xs: '100%', sm: 260 } }}
               InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
           )}
           <Tooltip title="Actualizar"><IconButton onClick={load}><RefreshIcon /></IconButton></Tooltip>
@@ -251,7 +263,7 @@ export default function Repos() {
         <Alert severity="info">Aún no hay repositorios. Añade una carpeta que ya tengas, clona por URL o ve a <b>Proyectos GitLab</b> para clonar uno de tus proyectos.</Alert>
       )}
       {data && repos.length > 0 && (
-        <Paper variant="outlined">
+        <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>

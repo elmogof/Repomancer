@@ -132,7 +132,7 @@ export default function History({ repoId, branch, act, onUndo, onTag, onCompare,
   return (
     <Box>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
-        <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '2fr 1.2fr 1.6fr 0.9fr 0.9fr' } }}>
+        <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: '2fr 1.2fr 1.6fr 0.9fr 0.9fr' } }}>
           <TextField size="small" label="Buscar en mensajes" value={form.q} onChange={(e) => set('q', e.target.value, 400)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
           <TextField size="small" label="Autor" placeholder="nombre o correo" value={form.author} onChange={(e) => set('author', e.target.value, 400)}

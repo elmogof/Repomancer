@@ -2,26 +2,34 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AppBar, Avatar, Box, CircularProgress, Drawer, IconButton, List, ListItemButton, ListItemIcon,
-  ListItemText, Menu, MenuItem, Toolbar, Tooltip, Typography,
+  ListItemText, Menu, MenuItem, Toolbar, Tooltip, Typography, useMediaQuery,
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/FolderCopy';
 import CloudIcon from '@mui/icons-material/Cloud';
 import MergeIcon from '@mui/icons-material/CallMerge';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import LogIcon from '@mui/icons-material/ReceiptLong';
+import AccountsIcon from '@mui/icons-material/ManageAccounts';
 import TreeIcon from '@mui/icons-material/AccountTree';
 import DarkIcon from '@mui/icons-material/DarkMode';
 import LightIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
 import CollapseIcon from '@mui/icons-material/KeyboardDoubleArrowLeft';
 import ExpandIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
+import CommandIcon from '@mui/icons-material/KeyboardCommandKey';
 import { api } from './api/client.js';
 import Login from './pages/Login.jsx';
 import RepoSearch from './components/RepoSearch.jsx';
-import { AutoFetchButton, AutoFetchWatcher } from './components/AutoFetch.jsx';
+import { AutoFetchButton, AutoFetchWatcher, AUTOFETCH_RUN } from './components/AutoFetch.jsx';
+import { CommandsProvider, OPEN_PALETTE, useCommands } from './components/Commands.jsx';
 import Repos from './pages/Repos.jsx';
 import RepoDetail from './pages/RepoDetail.jsx';
 import Projects from './pages/Projects.jsx';
 import MergeRequests from './pages/MergeRequests.jsx';
 import MergeRequestDetail from './pages/MergeRequestDetail.jsx';
+import PullRequests from './pages/PullRequests.jsx';
+import OpLog from './pages/OpLog.jsx';
+import Accounts from './pages/Accounts.jsx';
 
 const DRAWER = 250;
 const DRAWER_MINI = 68;
@@ -35,84 +43,135 @@ const nav = [
   { to: '/repos', label: 'Repositorios locales', icon: <FolderIcon /> },
   { to: '/projects', label: 'Proyectos GitLab', icon: <CloudIcon /> },
   { to: '/merge-requests', label: 'Merge requests', icon: <MergeIcon /> },
+  { to: '/pull-requests', label: 'Pull requests (GitHub)', icon: <GitHubIcon /> },
+  { to: '/oplog', label: 'Registro de operaciones', icon: <LogIcon /> },
+  { to: '/accounts', label: 'Cuentas', icon: <AccountsIcon /> },
 ];
+
+// Comandos globales de la paleta y sus atajos.
+function GlobalCommands({ onToggleMode, toggleNav }) {
+  const navigate = useNavigate();
+  useCommands('global', () => [
+    ...nav.map((n, i) => ({ id: `nav:${n.to}`, group: 'Ir a', title: n.label, keys: `alt+${i + 1}`, icon: n.icon, run: () => navigate(n.to) })),
+    { id: 'search', group: 'General', title: 'Buscar repositorio', keys: 'ctrl+k', passive: true, run: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })) },
+    { id: 'autofetch', group: 'General', title: 'Buscar novedades en los remotos (fetch de todos)', run: () => window.dispatchEvent(new Event(AUTOFETCH_RUN)) },
+    { id: 'theme', group: 'General', title: 'Cambiar tema claro / oscuro', keys: 'alt+t', run: onToggleMode },
+    { id: 'nav', group: 'General', title: 'Mostrar u ocultar el menú lateral', keys: 'alt+m', run: toggleNav },
+  ], []);
+  return null;
+}
 
 export default function App({ mode, onToggleMode }) {
   const [auth, setAuth] = useState(null);
   const [menu, setMenu] = useState(null);
-  // Menú lateral plegable: se recuerda la preferencia en este navegador.
+  // Menú lateral plegable: se recuerda la preferencia en este navegador. En móvil es un panel que se abre encima.
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('gm-nav-collapsed') === '1'; } catch { return false; } });
-  const toggleNav = () => setCollapsed((c) => { try { localStorage.setItem('gm-nav-collapsed', c ? '0' : '1'); } catch { /* sin almacenamiento */ } return !c; });
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobile = useMediaQuery((t) => t.breakpoints.down('md'));
+  const toggleNav = () => {
+    if (mobile) { setMobileOpen((o) => !o); return; }
+    setCollapsed((c) => { try { localStorage.setItem('gm-nav-collapsed', c ? '0' : '1'); } catch { /* sin almacenamiento */ } return !c; });
+  };
   const loc = useLocation();
   const navigate = useNavigate();
 
   const refresh = useCallback(() => api.get('/auth/status').then(setAuth).catch(() => setAuth({})), []);
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { setMobileOpen(false); }, [loc.pathname]);
 
   if (!auth) return <Box sx={{ display: 'grid', placeItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   if (!auth.user) return <Login auth={auth} onLoggedIn={refresh} />;
 
   const logout = async () => { setMenu(null); await api.post('/auth/logout'); navigate('/'); refresh(); };
+  const mini = collapsed && !mobile;
 
-  return (
-    <Box sx={{ display: 'flex' }}>
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
-        <Toolbar>
-          <Tooltip title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
-            <IconButton edge="start" onClick={toggleNav} sx={{ mr: 1 }} aria-label="Alternar menú lateral"><MenuIcon /></IconButton>
+  const navList = (
+    <>
+      <List sx={{ px: 1.5, py: 2, flexGrow: 1 }}>
+        <Typography variant="overline" color="text.secondary" noWrap component="div"
+          sx={{ px: 1.5, fontSize: '0.7rem', height: 32, opacity: mini ? 0 : 1, transition: 'opacity .15s' }}>Navegación</Typography>
+        {nav.map((n, i) => (
+          <Tooltip key={n.to} title={mini ? `${n.label} · Alt+${i + 1}` : ''} placement="right" arrow>
+            <ListItemButton sx={{ mb: 0.5, px: 1.5, minHeight: 44 }} selected={loc.pathname.startsWith(n.to)} onClick={() => navigate(n.to)}>
+              <ListItemIcon>{n.icon}</ListItemIcon>
+              <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500, noWrap: true }}
+                sx={{ opacity: mini ? 0 : 1, transition: 'opacity .15s' }} />
+            </ListItemButton>
           </Tooltip>
-          <Box sx={{ width: 32, height: 32, mr: 1.5, borderRadius: 2, display: 'grid', placeItems: 'center', color: '#fff', background: 'linear-gradient(135deg, #3399FF 0%, #0059B2 100%)', boxShadow: '0 2px 8px rgba(0, 114, 229, 0.4)' }}>
-            <TreeIcon fontSize="small" />
-          </Box>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>Git Manager</Typography>
-          <RepoSearch />
-          <AutoFetchWatcher />
-          <AutoFetchButton />
-          <Typography variant="body2" color="text.secondary" sx={{ mr: 2, px: 1.5, py: 0.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'action.hover', display: { xs: 'none', lg: 'block' } }}>{auth.url}</Typography>
-          <Tooltip title="Cambiar tema"><IconButton onClick={onToggleMode}>{mode === 'dark' ? <LightIcon /> : <DarkIcon />}</IconButton></Tooltip>
-          <IconButton onClick={(e) => setMenu(e.currentTarget)}><Avatar src={auth.user.avatar_url} sx={{ width: 32, height: 32 }} /></IconButton>
-          <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
-            <MenuItem disabled>{auth.user.name} (@{auth.user.username}) · {auth.authType === 'oauth' ? 'OAuth' : 'Token personal'}</MenuItem>
-            <MenuItem onClick={logout}>Cerrar sesión</MenuItem>
-          </Menu>
-        </Toolbar>
-      </AppBar>
-      <Drawer variant="permanent" sx={(t) => {
-        const width = collapsed ? DRAWER_MINI : DRAWER;
-        const transition = t.transitions.create('width', { duration: t.transitions.duration.shorter });
-        return { width, flexShrink: 0, transition, '& .MuiDrawer-paper': { width, boxSizing: 'border-box', overflowX: 'hidden', transition } };
-      }}>
-        <Toolbar />
-        <List sx={{ px: 1.5, py: 2, flexGrow: 1 }}>
-          <Typography variant="overline" color="text.secondary" noWrap component="div"
-            sx={{ px: 1.5, fontSize: '0.7rem', height: 32, opacity: collapsed ? 0 : 1, transition: 'opacity .15s' }}>Navegación</Typography>
-          {nav.map((n) => (
-            <Tooltip key={n.to} title={collapsed ? n.label : ''} placement="right" arrow>
-              <ListItemButton sx={{ mb: 0.5, px: 1.5, minHeight: 44 }} selected={loc.pathname.startsWith(n.to)} onClick={() => navigate(n.to)}>
-                <ListItemIcon>{n.icon}</ListItemIcon>
-                <ListItemText primary={n.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500, noWrap: true }}
-                  sx={{ opacity: collapsed ? 0 : 1, transition: 'opacity .15s' }} />
-              </ListItemButton>
-            </Tooltip>
-          ))}
-        </List>
-        <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end' }}>
-          <Tooltip title={collapsed ? 'Expandir menú' : 'Contraer menú'} placement="right">
-            <IconButton size="small" onClick={toggleNav}>{collapsed ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}</IconButton>
+        ))}
+      </List>
+      {!mobile && (
+        <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: mini ? 'center' : 'flex-end' }}>
+          <Tooltip title={mini ? 'Expandir menú' : 'Contraer menú'} placement="right">
+            <IconButton size="small" onClick={toggleNav}>{mini ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}</IconButton>
           </Tooltip>
         </Box>
-      </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, minWidth: 0 }}>
-        <Toolbar />
-        <Routes>
-          <Route path="/repos" element={<Repos />} />
-          <Route path="/repos/:id" element={<RepoDetailKeyed />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/merge-requests" element={<MergeRequests />} />
-          <Route path="/projects/:pid/merge-requests/:iid" element={<MergeRequestDetail />} />
-          <Route path="*" element={<Navigate to="/repos" replace />} />
-        </Routes>
+      )}
+    </>
+  );
+
+  return (
+    <CommandsProvider>
+      <GlobalCommands onToggleMode={onToggleMode} toggleNav={toggleNav} />
+      <Box sx={{ display: 'flex' }}>
+        <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
+          <Toolbar sx={{ gap: { xs: 0.5, sm: 0 } }}>
+            <Tooltip title={mini ? 'Expandir menú' : 'Contraer menú'}>
+              <IconButton edge="start" onClick={toggleNav} sx={{ mr: { xs: 0, sm: 1 } }} aria-label="Alternar menú lateral"><MenuIcon /></IconButton>
+            </Tooltip>
+            <Box sx={{ width: 32, height: 32, mr: 1.5, borderRadius: 2, display: { xs: 'none', sm: 'grid' }, placeItems: 'center', color: '#fff', background: 'linear-gradient(135deg, #3399FF 0%, #0059B2 100%)', boxShadow: '0 2px 8px rgba(0, 114, 229, 0.4)' }}>
+              <TreeIcon fontSize="small" />
+            </Box>
+            <Typography variant="h6" noWrap sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>Git Manager</Typography>
+            <Box sx={{ flexGrow: 1, display: { xs: 'block', sm: 'none' } }} />
+            <RepoSearch />
+            <Tooltip title="Paleta de comandos (Ctrl+Mayús+P)">
+              <IconButton onClick={() => window.dispatchEvent(new Event(OPEN_PALETTE))} sx={{ display: { xs: 'none', md: 'inline-flex' } }} aria-label="Paleta de comandos"><CommandIcon /></IconButton>
+            </Tooltip>
+            <AutoFetchWatcher />
+            <AutoFetchButton />
+            <Typography variant="body2" color="text.secondary" sx={{ mr: 2, px: 1.5, py: 0.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'action.hover', display: { xs: 'none', lg: 'block' } }}>{auth.url}</Typography>
+            <Tooltip title="Cambiar tema (Alt+T)"><IconButton onClick={onToggleMode} sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>{mode === 'dark' ? <LightIcon /> : <DarkIcon />}</IconButton></Tooltip>
+            <IconButton onClick={(e) => setMenu(e.currentTarget)}><Avatar src={auth.user.avatar_url} sx={{ width: 32, height: 32 }} /></IconButton>
+            <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+              <MenuItem disabled>{auth.user.name} (@{auth.user.username}) · {auth.authType === 'oauth' ? 'OAuth' : 'Token personal'}</MenuItem>
+              <MenuItem onClick={() => { setMenu(null); navigate('/accounts'); }}>Cuentas</MenuItem>
+              <MenuItem onClick={() => { setMenu(null); onToggleMode(); }} sx={{ display: { sm: 'none' } }}>Cambiar tema</MenuItem>
+              <MenuItem onClick={logout}>Cerrar sesión</MenuItem>
+            </Menu>
+          </Toolbar>
+        </AppBar>
+        {mobile ? (
+          <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)} ModalProps={{ keepMounted: true }}
+            sx={{ '& .MuiDrawer-paper': { width: DRAWER, boxSizing: 'border-box' } }}>
+            <Toolbar />
+            {navList}
+          </Drawer>
+        ) : (
+          <Drawer variant="permanent" sx={(t) => {
+            const width = mini ? DRAWER_MINI : DRAWER;
+            const transition = t.transitions.create('width', { duration: t.transitions.duration.shorter });
+            return { width, flexShrink: 0, transition, '& .MuiDrawer-paper': { width, boxSizing: 'border-box', overflowX: 'hidden', transition } };
+          }}>
+            <Toolbar />
+            {navList}
+          </Drawer>
+        )}
+        <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2, md: 3 }, minWidth: 0 }}>
+          <Toolbar />
+          <Routes>
+            <Route path="/repos" element={<Repos />} />
+            <Route path="/repos/:id" element={<RepoDetailKeyed />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/merge-requests" element={<MergeRequests />} />
+            <Route path="/projects/:pid/merge-requests/:iid" element={<MergeRequestDetail />} />
+            <Route path="/pull-requests" element={<PullRequests />} />
+            <Route path="/oplog" element={<OpLog />} />
+            <Route path="/accounts" element={<Accounts />} />
+            <Route path="*" element={<Navigate to="/repos" replace />} />
+          </Routes>
+        </Box>
       </Box>
-    </Box>
+    </CommandsProvider>
   );
 }

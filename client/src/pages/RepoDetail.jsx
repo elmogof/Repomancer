@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert, Box, Button, ButtonGroup, Checkbox, Chip, CircularProgress, Divider,
   FormControlLabel, IconButton, LinearProgress, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem, Paper,
-  Radio, Stack, Tab, Tabs, TextField, Tooltip, Typography,
+  Radio, Stack, Tab, Tabs, Tooltip, Typography, useMediaQuery,
 } from '@mui/material';
 import PullIcon from '@mui/icons-material/Download';
 import PushIcon from '@mui/icons-material/Upload';
@@ -19,10 +19,15 @@ import StashIcon from '@mui/icons-material/Inventory2Outlined';
 import DropIcon from '@mui/icons-material/ArrowDropDown';
 import ConflictIcon from '@mui/icons-material/ReportProblemOutlined';
 import FileHistoryIcon from '@mui/icons-material/ManageHistory';
+import ListIcon from '@mui/icons-material/FormatListBulleted';
 import { api, qs } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import DiffView from '../components/DiffView.jsx';
 import CreateMRDialog from '../components/CreateMRDialog.jsx';
+import CreatePRDialog from '../components/CreatePRDialog.jsx';
+import CommitBox from '../components/CommitBox.jsx';
+import { useCommands } from '../components/Commands.jsx';
+import { setInstance } from '../gitlabInstance.js';
 import ConflictResolver from '../components/ConflictResolver.jsx';
 import { ConfirmDialog, StashDialog, TagDialog, nextVersion } from '../components/GitDialogs.jsx';
 import { describePull, getPullPrefs, setPullPrefs } from '../pullPrefs.js';
@@ -70,6 +75,11 @@ export default function RepoDetail() {
   const [confirm, setConfirm] = useState(null);
   const [compareInit, setCompareInit] = useState(null); // { base, head } al abrir Comparar desde otra pestaña
   const [fileInit, setFileInit] = useState(null); // archivo a abrir en la pestaña Archivos
+  const [github, setGithub] = useState(null); // datos del repo en GitHub (si hay cuenta)
+  const [prOpen, setPrOpen] = useState(false);
+  const messageRef = useRef(null);
+  const mobile = useMediaQuery((t) => t.breakpoints.down('md'));
+  const compact = useMediaQuery((t) => t.breakpoints.down('sm'));
 
   const load = useCallback(() => api.get(`/repos/${id}/status`).then(setSt).catch((e) => notify(e.message, 'error')), [id, notify]);
   useEffect(() => { load(); }, [load]);
@@ -84,6 +94,10 @@ export default function RepoDetail() {
     if (!st) return;
     api.get(`/repos/${id}/outgoing`).then(setOutgoing).catch(() => setOutgoing(null));
   }, [id, st]);
+
+  const ghAccount = st?.remote?.provider === 'github' && st.remote.account;
+  const loadGithub = useCallback(() => api.get(`/repos/${id}/github`).then(setGithub).catch(() => setGithub(null)), [id]);
+  useEffect(() => { if (ghAccount) loadGithub(); else setGithub(null); }, [ghAccount, st?.branch, loadGithub]);
 
   // Si el archivo en conflicto abierto ya se resolvió, se pasa al siguiente.
   useEffect(() => {
@@ -190,6 +204,30 @@ export default function RepoDetail() {
     catch (e) { notify(e.message, 'error'); }
   };
 
+  const goTab = (t) => { setTab(t); };
+  const canStash = !!st && st.files.length > 0 && !st.files.some((f) => f.conflict);
+
+  // Comandos de la paleta y atajos de teclado (solo fuera de campos de texto).
+  useCommands('repo-detail', () => (st ? [
+    { id: 'fetch', group: `Repositorio · ${st.name}`, title: 'Fetch', keys: 'f', icon: <FetchIcon fontSize="small" />, disabled: !!busy, run: () => act('fetch', () => api.post(`/repos/${id}/fetch`), 'Fetch') },
+    { id: 'pull', group: `Repositorio · ${st.name}`, title: `Pull (${describePull(pullPrefs)})`, keys: 'p', icon: <PullIcon fontSize="small" />, disabled: !!busy, run: () => pull() },
+    { id: 'pull-rebase', group: `Repositorio · ${st.name}`, title: 'Pull con rebase', disabled: !!busy, run: () => pull({ ...pullPrefs, rebase: true }) },
+    { id: 'push', group: `Repositorio · ${st.name}`, title: 'Push', keys: 'shift+p', icon: <PushIcon fontSize="small" />, disabled: !!busy, run: () => act('push', () => api.post(`/repos/${id}/push`), 'Push') },
+    { id: 'commit-msg', group: `Repositorio · ${st.name}`, title: 'Escribir mensaje de commit', keys: 'c', icon: <CommitIcon fontSize="small" />, run: () => { setTab(0); setTimeout(() => messageRef.current?.focus(), 50); } },
+    { id: 'stage-all', group: `Repositorio · ${st.name}`, title: 'Añadir todos los cambios al stage', keys: 'a', disabled: !!busy, run: () => act('stage', () => api.post(`/repos/${id}/stage`, { all: true })) },
+    { id: 'stash', group: `Repositorio · ${st.name}`, title: 'Guardar cambios en stash', keys: 's', icon: <StashIcon fontSize="small" />, disabled: !!busy || !canStash, run: () => setStashOpen(true) },
+    { id: 'undo', group: `Repositorio · ${st.name}`, title: 'Deshacer último commit', disabled: !!busy || !!st.operation, run: () => undoCommit() },
+    { id: 'tag', group: `Repositorio · ${st.name}`, title: 'Nuevo tag', keys: 't', run: () => newTag() },
+    { id: 'mr', group: `Repositorio · ${st.name}`, title: st.remote?.provider === 'github' ? 'Crear pull request' : 'Crear merge request', keys: 'm',
+      disabled: !(st.remote?.provider === 'gitlab' || ghAccount), run: () => (st.remote?.provider === 'github' ? setPrOpen(true) : openMR()) },
+    { id: 'refresh', group: `Repositorio · ${st.name}`, title: 'Actualizar estado', keys: 'r', run: () => load() },
+    { id: 'open-folder', group: `Repositorio · ${st.name}`, title: 'Abrir carpeta en el explorador', run: () => api.post(`/repos/${id}/open`, { target: 'folder' }).catch((e) => notify(e.message, 'error')) },
+    { id: 'open-code', group: `Repositorio · ${st.name}`, title: 'Abrir en VS Code', run: () => api.post(`/repos/${id}/open`, { target: 'vscode' }).catch((e) => notify(e.message, 'error')) },
+    { id: 'open-term', group: `Repositorio · ${st.name}`, title: 'Abrir terminal en la carpeta', run: () => api.post(`/repos/${id}/open`, { target: 'terminal' }).catch((e) => notify(e.message, 'error')) },
+    { id: 'back', group: `Repositorio · ${st.name}`, title: 'Volver a la lista de repositorios', keys: 'backspace', icon: <BackIcon fontSize="small" />, run: () => navigate('/repos') },
+    ...['Cambios', 'Historial', 'Ramas', 'Comparar', 'Archivos', 'Stash', 'Tags'].map((t, i) => ({ id: `tab:${i}`, group: 'Pestañas', title: `Ir a ${t}`, keys: String(i + 1), run: () => goTab(i) })),
+  ] : []), [st, busy, pullPrefs, canStash, ghAccount]);
+
   if (!st) return <CircularProgress />;
   const conflicts = st.files.filter((f) => f.conflict);
   const staged = st.files.filter((f) => f.staged && !f.conflict);
@@ -225,40 +263,56 @@ export default function RepoDetail() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: { md: 'calc(100vh - 112px)' }, minHeight: 0 }}>
       <Box sx={{ flexShrink: 0, position: 'relative' }}>
         {/* Barra de progreso pegada bajo la barra superior, superpuesta para no alterar la altura. */}
-        {busy && <LinearProgress sx={{ position: 'absolute', top: -24, left: -24, right: -24, height: 2, borderRadius: 0, bgcolor: 'transparent', zIndex: 1 }} />}
+        {busy && <LinearProgress sx={{ position: 'absolute', top: { xs: -12, sm: -16, md: -24 }, left: { xs: -12, sm: -16, md: -24 }, right: { xs: -12, sm: -16, md: -24 }, height: 2, borderRadius: 0, bgcolor: 'transparent', zIndex: 1 }} />}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
-          <IconButton onClick={() => navigate('/repos')}><BackIcon /></IconButton>
-          <Typography variant="h5">{st.name}</Typography>
-          <Chip label={st.branch} color="primary" variant="outlined" />
+          <Tooltip title="Volver a la lista (Retroceso)"><IconButton onClick={() => navigate('/repos')} sx={{ ml: { xs: -1, sm: 0 } }}><BackIcon /></IconButton></Tooltip>
+          <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 24 }, wordBreak: 'break-word', minWidth: 0 }}>{st.name}</Typography>
+          <Chip label={st.branch} color="primary" variant="outlined" sx={{ maxWidth: { xs: '100%', sm: 360 } }} />
           {st.upstream ? <Typography variant="body2" color="text.secondary">→ {st.upstream} {st.ahead > 0 && `↑${st.ahead}`} {st.behind > 0 && `↓${st.behind}`}</Typography>
             : <Chip size="small" label="Sin publicar" />}
           <Box sx={{ flexGrow: 1 }} />
-          <ButtonGroup variant="outlined">
-            <Button startIcon={<FetchIcon />} disabled={!!busy} onClick={() => act('fetch', () => api.post(`/repos/${id}/fetch`), 'Fetch')}>Fetch</Button>
-            <Tooltip title={`Pull con ${describePull(pullPrefs)}`}>
-              <Button startIcon={<PullIcon />} disabled={!!busy} onClick={() => pull()}>Pull{st.behind ? ` (${st.behind})` : ''}</Button>
+          <ButtonGroup variant="outlined" size={compact ? 'small' : 'medium'} sx={{ '& .MuiButton-startIcon': compact ? { mr: 0.5 } : {} }}>
+            <Tooltip title="Fetch (F)">
+              <Button startIcon={<FetchIcon />} disabled={!!busy} onClick={() => act('fetch', () => api.post(`/repos/${id}/fetch`), 'Fetch')}>{compact ? '' : 'Fetch'}</Button>
+            </Tooltip>
+            <Tooltip title={`Pull con ${describePull(pullPrefs)} (P)`}>
+              <Button startIcon={<PullIcon />} disabled={!!busy} onClick={() => pull()}>{compact ? (st.behind || '') : `Pull${st.behind ? ` (${st.behind})` : ''}`}</Button>
             </Tooltip>
             <Tooltip title="Opciones de pull">
               <Button size="small" disabled={!!busy} onClick={(e) => setPullMenu(e.currentTarget)} sx={{ px: 0.5, minWidth: 0 }} aria-label="Opciones de pull"><DropIcon /></Button>
             </Tooltip>
-            <Button startIcon={<PushIcon />} disabled={!!busy} onClick={() => act('push', () => api.post(`/repos/${id}/push`), 'Push')}>Push{st.ahead ? ` (${st.ahead})` : ''}</Button>
+            <Tooltip title="Push (Mayús+P)">
+              <Button startIcon={<PushIcon />} disabled={!!busy} onClick={() => act('push', () => api.post(`/repos/${id}/push`), 'Push')}>{compact ? (st.ahead || '') : `Push${st.ahead ? ` (${st.ahead})` : ''}`}</Button>
+            </Tooltip>
           </ButtonGroup>
           {st.remote?.provider === 'github' ? (
-            <Tooltip title={`Abre GitHub para crear un pull request desde «${st.branch}»`}>
-              <Button variant="contained" startIcon={<MergeIcon />} endIcon={<WebIcon fontSize="small" />}
-                href={`${st.remote.web}/compare/${encodeURIComponent(st.branch)}?expand=1`} target="_blank" rel="noopener">Pull request</Button>
-            </Tooltip>
+            ghAccount && github?.pulls?.length ? (
+              <Tooltip title={`Pull request abierto: ${github.pulls[0].title}`}>
+                <Button variant="contained" size={compact ? 'small' : 'medium'} startIcon={<MergeIcon />} endIcon={<WebIcon fontSize="small" />} href={github.pulls[0].html_url} target="_blank" rel="noopener">
+                  PR #{github.pulls[0].number}
+                </Button>
+              </Tooltip>
+            ) : ghAccount ? (
+              <Tooltip title={`Crear un pull request desde «${st.branch}» (M)`}>
+                <span><Button variant="contained" size={compact ? 'small' : 'medium'} startIcon={<MergeIcon />} disabled={!github} onClick={() => setPrOpen(true)}>Pull request</Button></span>
+              </Tooltip>
+            ) : (
+              <Tooltip title={`Abre GitHub para crear un pull request desde «${st.branch}». Añade una cuenta de GitHub en Cuentas para crearlo desde aquí.`}>
+                <Button variant="contained" size={compact ? 'small' : 'medium'} startIcon={<MergeIcon />} endIcon={<WebIcon fontSize="small" />}
+                  href={`${st.remote.web}/compare/${encodeURIComponent(st.branch)}?expand=1`} target="_blank" rel="noopener">Pull request</Button>
+              </Tooltip>
+            )
           ) : (
-            <Tooltip title={st.remote?.provider === 'gitlab' ? '' : st.remote
-              ? `El remoto (${st.remote.host}) no está en tu GitLab (${st.remote.gitlabHost || 'sin configurar'}); no se pueden crear merge requests desde aquí`
+            <Tooltip title={st.remote?.provider === 'gitlab' ? 'Crear merge request (M)' : st.remote
+              ? `El remoto (${st.remote.host}) no está en ninguna instancia de GitLab configurada; añádela en Cuentas para crear merge requests desde aquí`
               : 'El repositorio no tiene remoto origin'}>
               <span>
-                <Button variant="contained" startIcon={<MergeIcon />} onClick={openMR} disabled={st.remote?.provider !== 'gitlab'}>Merge request</Button>
+                <Button variant="contained" size={compact ? 'small' : 'medium'} startIcon={<MergeIcon />} onClick={openMR} disabled={st.remote?.provider !== 'gitlab'}>{compact ? 'MR' : 'Merge request'}</Button>
               </span>
             </Tooltip>
           )}
         </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, ml: 6 }}>{st.path}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, ml: { xs: 0, sm: 6 }, fontSize: { xs: 11.5, sm: 14 }, wordBreak: 'break-all' }}>{st.path}</Typography>
         {(st.operation || conflicts.length > 0) && (
           <Alert severity={conflicts.length ? 'error' : 'warning'} sx={{ mb: 1 }} action={
             <Stack direction="row" spacing={1}>
@@ -296,26 +350,11 @@ export default function RepoDetail() {
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: { md: tab === 0 ? 'hidden' : 'auto' } }}>
         {tab === 0 && (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px 1fr' }, gap: 2, height: { md: '100%' } }}>
-            <Stack spacing={2} sx={{ minHeight: 0, overflow: { md: 'auto' } }}>
-              <Paper variant="outlined" sx={{ p: 2, flexShrink: 0 }}>
-                <TextField fullWidth multiline minRows={3} label="Mensaje del commit" placeholder={'Resumen corto (primera línea)\n\nDescripción opcional'} value={message} onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && staged.length) commit(false); }}
-                  helperText={message ? `${message.split('\n')[0].length} caracteres en el resumen · Ctrl+Enter para commit` : 'Ctrl+Enter para commit'} />
-                <FormControlLabel control={<Checkbox checked={amend} onChange={(e) => setAmend(e.target.checked)} size="small" />} label="Corregir último commit (amend)" />
-                <Stack direction="row" spacing={1}>
-                  <Button fullWidth variant="contained" disabled={!!busy || (!staged.length && !amend) || (!message.trim() && !amend)} onClick={() => commit(false)}>Commit ({staged.length})</Button>
-                  <Button fullWidth variant="outlined" disabled={!!busy || (!staged.length && !amend) || (!message.trim() && !amend)} onClick={() => commit(true)}>Commit y push</Button>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  <Tooltip title="Aparta los cambios sin hacer commit y deja el árbol limpio">
-                    <span style={{ flex: 1 }}><Button fullWidth size="small" startIcon={<StashIcon fontSize="small" />} disabled={!!busy || !st.files.length || conflicts.length > 0} onClick={() => setStashOpen(true)}>Stash</Button></span>
-                  </Tooltip>
-                  <Tooltip title="Reset suave: quita el último commit y deja sus cambios preparados">
-                    <span style={{ flex: 1 }}><Button fullWidth size="small" startIcon={<UndoIcon fontSize="small" />} disabled={!!busy || !!st.operation} onClick={() => undoCommit()}>Deshacer commit</Button></span>
-                  </Tooltip>
-                </Stack>
-              </Paper>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: 2, height: { md: '100%' } }}>
+            <Stack spacing={2} sx={{ minHeight: 0, overflow: { md: 'auto' }, display: mobile && (conflictSel || commitSel || selected) ? 'none' : 'flex' }}>
+              <CommitBox repoId={id} message={message} setMessage={setMessage} amend={amend} setAmend={setAmend} staged={staged.length} busy={busy}
+                onCommit={commit} onStash={() => setStashOpen(true)} onUndo={() => undoCommit()} canStash={canStash} canUndo={!st.operation}
+                notify={notify} inputRef={messageRef} />
               {outgoing && outgoing.commits.length > 0 && (
                 <Paper variant="outlined" sx={{ maxHeight: '30vh', overflow: 'auto', flexShrink: 0 }}>
                   <List dense disablePadding>
@@ -373,7 +412,10 @@ export default function RepoDetail() {
                 </List>
               </Paper>
             </Stack>
-            <Box sx={{ minWidth: 0, minHeight: 0, overflow: { md: 'auto' } }}>
+            <Box sx={{ minWidth: 0, minHeight: 0, overflow: { md: 'auto' }, display: mobile && !(conflictSel || commitSel || selected) ? 'none' : 'block' }}>
+              {mobile && (
+                <Button size="small" startIcon={<ListIcon />} sx={{ mb: 1 }} onClick={() => { setSelected(null); setCommitSel(null); setConflictSel(null); }}>Volver a los cambios</Button>
+              )}
               {conflictSel ? (
                 <ConflictResolver repoId={id} file={conflictSel} notify={notify} onResolved={() => { setVersion((v) => v + 1); load(); }} />
               ) : commitSel ? (
@@ -443,7 +485,16 @@ export default function RepoDetail() {
         onClose={() => setConfirm(null)} onConfirm={() => { const c = confirm; setConfirm(null); c.run(); }} />
 
       <CreateMRDialog open={mrOpen} onClose={() => setMrOpen(false)} project={project} sourceBranch={st.branch}
-        onCreated={(mr) => { setMrOpen(false); notify(`Merge request !${mr.iid} creado`); navigate(`/projects/${mr.project_id}/merge-requests/${mr.iid}`); }} />
+        onCreated={(mr) => {
+          setMrOpen(false); notify(`Merge request !${mr.iid} creado`);
+          setInstance(project?.instance || 'main'); // el detalle del MR se consulta en la instancia del proyecto
+          navigate(`/projects/${mr.project_id}/merge-requests/${mr.iid}`);
+        }} />
+      <CreatePRDialog open={prOpen} onClose={() => setPrOpen(false)} repoId={id} github={github}
+        onCreated={(pr) => {
+          setPrOpen(false); loadGithub();
+          notify(`Pull request #${pr.number} creado`, 'success', { action: { label: 'Abrir en GitHub', onClick: () => window.open(pr.html_url, '_blank', 'noopener') } });
+        }} />
     </Box>
   );
 }
