@@ -6,6 +6,9 @@ import { PORT } from './gitlab.js';
 import authRoutes from './routes/auth.js';
 import gitlabRoutes from './routes/gitlab.js';
 import repoRoutes from './routes/repos.js';
+import fsRoutes from './routes/fs.js';
+import autoFetchRoutes from './routes/autofetch.js';
+import { start as startAutoFetch } from './autofetch.js';
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -33,6 +36,8 @@ const wrap = (router) => {
 app.use('/api/auth', wrap(authRoutes));
 app.use('/api/gitlab', wrap(gitlabRoutes));
 app.use('/api/repos', wrap(repoRoutes));
+app.use('/api/fs', wrap(fsRoutes));
+app.use('/api/auto-fetch', wrap(autoFetchRoutes));
 
 // En producción sirve el frontend compilado.
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
@@ -50,4 +55,5 @@ app.use((err, req, res, next) => {
 // Solo escucha en la máquina local: nadie de la red puede conectarse.
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`Git Manager API en http://localhost:${PORT}`);
+  startAutoFetch();
 });
