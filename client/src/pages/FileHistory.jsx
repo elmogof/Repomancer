@@ -138,13 +138,16 @@ export default function FileHistory({ repoId, file: initialFile, version, notify
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        {picker}
-        <ToggleButtonGroup size="small" exclusive value={view} onChange={(e, v) => v && setView(v)} sx={{ '& .MuiToggleButton-root': { gap: 0.75, px: 1.5, textTransform: 'none' } }}>
-          <ToggleButton value="log"><HistoryIcon fontSize="small" />Historial</ToggleButton>
-          <ToggleButton value="blame"><BlameIcon fontSize="small" />Blame</ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
+      {/* Dentro de un panel con margen: así la etiqueta flotante del campo no queda cortada por el borde del área con scroll. */}
+      <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+          {picker}
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(e, v) => v && setView(v)} sx={{ '& .MuiToggleButton-root': { gap: 0.75, px: 1.5, textTransform: 'none' } }}>
+            <ToggleButton value="log"><HistoryIcon fontSize="small" />Historial</ToggleButton>
+            <ToggleButton value="blame"><BlameIcon fontSize="small" />Blame</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+      </Paper>
       {view === 'blame' && rev && (
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
           <Chip size="small" color="primary" variant="outlined" label={`Versión ${rev.short}`} onDelete={() => setRev(null)} />

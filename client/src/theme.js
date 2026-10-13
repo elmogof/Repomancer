@@ -273,6 +273,10 @@ export default function buildTheme(mode) {
             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: dark ? primaryDark[400] : grey[300] },
             '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(blue[500], dark ? 0.3 : 0.2)}` },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: blue[500], borderWidth: 1 },
+            // Con etiqueta flotante, el anillo de foco (una sombra sin hueco) cruzaría la etiqueta:
+            // en esos campos se resalta el borde, que sí respeta el hueco de la etiqueta.
+            '.MuiInputLabel-root + &.Mui-focused': { boxShadow: 'none' },
+            '.MuiInputLabel-root + &.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2 },
           },
         },
       },
