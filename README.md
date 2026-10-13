@@ -31,6 +31,25 @@ npm start
 
 El servidor solo escucha en `127.0.0.1`, así que nadie de tu red puede conectarse.
 
+## Start with Windows (logon task)
+
+To have the app always available at `http://localhost:4000` without running `npm run dev`, install the logon task:
+
+```bash
+npm run startup:install
+```
+
+It builds the client and creates a Task Scheduler task named **Git Manager**. The task starts the server, with no window, every time you sign in to Windows. It also adds a **Git Manager** shortcut to the Start menu. The server runs as your user, so "Open terminal", "Open in VS Code" and your git credentials keep working. This is the reason it is a logon task and not a Windows service.
+
+| Command | What it does |
+|---|---|
+| `npm run startup:status` | Shows whether the task exists and the app responds |
+| `npm run startup:stop` / `startup:start` | Stops or starts the server |
+| `npm run startup:restart` | Rebuilds the client and restarts; run it after pulling or changing code |
+| `npm run startup:uninstall` | Removes the task and the shortcut |
+
+Both modes use port 4000, so stop the task before `npm run dev` (`npm run startup:stop`) and start it again afterwards. The server output goes to `server.log` in your `.git-manager` folder.
+
 ## Inicio de sesión
 
 ### Opción 1: Personal Access Token (recomendada para empezar)

@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm:dev -w server\" \"npm:dev -w client\"",
     "build": "npm run build -w client",
-    "start": "npm run build && npm start -w server"
+    "start": "npm run build && npm start -w server",
+    "startup:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 install",
+    "startup:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 uninstall",
+    "startup:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 start",
+    "startup:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 stop",
+    "startup:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 restart",
+    "startup:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 status"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
