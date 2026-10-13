@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { load, update } from './config.js';
 import * as git from './git.js';
+import { record } from './oplog.js';
 
 const DEFAULTS = { enabled: true, minutes: 10 };
 export const INTERVALS = [5, 10, 15, 30, 60];
@@ -76,6 +77,11 @@ export async function runOnce() {
   state.running = false;
   state.lastRun = new Date().toISOString();
   state.lastResult = { repos: repos.length, updated: updates.length, failed, ms: Date.now() - started };
+  record({
+    action: 'auto-fetch', label: 'Fetch automático', source: 'automático', ok: !failed.length, ms: state.lastResult.ms,
+    summary: `${repos.length} repos · ${updates.length ? `${updates.length} con commits nuevos` : 'sin novedades'}${failed.length ? ` · ${failed.length} con error` : ''}`,
+    details: [...updates.map((u) => `${u.name} (${u.branch}): +${u.newCommits}, ${u.behind} por bajar`), ...failed.map((f) => `${f.name}: ${f.error}`)].join('\n') || null,
+  });
   if (updates.length) {
     state.events.push({ seq: ++state.seq, at: state.lastRun, updates });
     state.events = state.events.slice(-50);

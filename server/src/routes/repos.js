@@ -8,6 +8,9 @@ import { api } from '../gitlab.js';
 import { currentBranch, findRepos } from '../scan.js';
 import { TARGETS, openIn, webUrl } from '../open.js';
 import { lastFetch, markFetched } from '../autofetch.js';
+import { accountForHost, gitlabInstances } from '../accounts.js';
+import { gh, ownerRepo, pickPull } from '../github.js';
+import { suggest } from '../commitmsg.js';
 
 const r = Router();
 
@@ -150,14 +153,15 @@ r.post('/add-many', async (req, res) => {
 });
 
 r.post('/clone', async (req, res) => {
-  const { url, dir, gitlabProjectId } = req.body || {};
+  const { url, dir, gitlabProjectId, gitlabInstance } = req.body || {};
   if (!url || !/^(https?:\/\/|git@|ssh:\/\/)/.test(url)) throw bad('URL de clonado inválida');
   const parent = dir || load().defaultCloneDir;
   const name = url.replace(/\.git$/, '').split(/[/:]/).pop();
   const dest = path.resolve(parent, name);
   if (fs.existsSync(dest) && fs.readdirSync(dest).length) throw bad(`La carpeta destino ya existe y no está vacía: ${dest}`);
   await git.clone(url, dest);
-  res.json(addRepo(dest, gitlabProjectId ? { gitlabProjectId } : {}));
+  const instance = gitlabInstance && gitlabInstance !== 'main' && gitlabInstances().some((i) => i.id === gitlabInstance) ? gitlabInstance : undefined;
+  res.json(addRepo(dest, gitlabProjectId ? { gitlabProjectId, ...(instance ? { gitlabInstance: instance } : {}) } : {}));
 });
 
 r.put('/settings', (req, res) => {
@@ -231,8 +235,15 @@ function remoteInfo(url, repo) {
   const host = new URL(web).host;
   let glHost = null;
   try { glHost = new URL(load().gitlab?.url).host; } catch { /* sin GitLab configurado */ }
-  const provider = host === glHost || repo.gitlabProjectId ? 'gitlab' : /(^|\.)github\.com$/i.test(host) ? 'github' : 'other';
-  return { web, host, provider, gitlabHost: glHost };
+  const extraGl = accountForHost(host, 'gitlab');
+  const ghAcc = accountForHost(host, 'github');
+  const isGithub = !!ghAcc || /(^|\.)github\.com$/i.test(host);
+  const provider = host === glHost || repo.gitlabProjectId || extraGl ? 'gitlab' : isGithub ? 'github' : 'other';
+  return {
+    web, host, provider, gitlabHost: glHost,
+    instance: provider === 'gitlab' ? (extraGl ? extraGl.id : 'main') : null,
+    account: provider === 'github' ? (ghAcc ? { id: ghAcc.id, user: ghAcc.user?.username } : null) : null,
+  };
 }
 
 r.get('/:id/diff', async (req, res) => {
@@ -850,21 +861,65 @@ r.get('/:id/commit/:hash', async (req, res) => {
   res.json({ hash, parents: parents.split(' ').filter(Boolean), author, date, message: body.join('\n').trim(), diff: diff.replace(/^\n+/, '') });
 });
 
+// ---------- mensaje de commit sugerido (local, sin servicios externos) ----------
+r.post('/:id/suggest-message', async (req, res) => {
+  const repo = getRepo(req.params.id);
+  res.json(await suggest(repo.path));
+});
+
+// ---------- GitHub ----------
+// Datos del repo en GitHub y pull requests de la rama actual (requiere una cuenta de GitHub para ese host).
+async function githubCtx(repo) {
+  const web = webUrl(await git.remoteUrl(repo.path));
+  const host = web ? new URL(web).host : null;
+  const account = accountForHost(host, 'github');
+  if (!account) throw bad(`Añade una cuenta de GitHub para ${host || 'este remoto'} en Cuentas para gestionar pull requests desde aquí`, 404);
+  const or = ownerRepo(web);
+  if (!or) throw bad('No se pudo identificar el repositorio de GitHub');
+  return { account, ...or };
+}
+
+r.get('/:id/github', async (req, res) => {
+  const repo = getRepo(req.params.id);
+  const { account, owner, repo: name } = await githubCtx(repo);
+  const s = await git.status(repo.path);
+  const [info, pulls, branches] = await Promise.all([
+    gh(account, `/repos/${owner}/${name}`),
+    gh(account, `/repos/${owner}/${name}/pulls`, { query: { state: 'open', head: s.branch ? `${owner}:${s.branch}` : undefined, per_page: 20 } }),
+    gh(account, `/repos/${owner}/${name}/branches`, { query: { per_page: 100 } }),
+  ]);
+  res.json({
+    owner, repo: name, full_name: info.full_name, default_branch: info.default_branch, html_url: info.html_url,
+    branch: s.branch, pulls: pulls.map(pickPull), branches: branches.map((b) => b.name), user: account.user?.username,
+  });
+});
+
+r.post('/:id/github/pulls', async (req, res) => {
+  const repo = getRepo(req.params.id);
+  const { account, owner, repo: name } = await githubCtx(repo);
+  const { title, body, head, base, draft } = req.body || {};
+  if (!title?.trim() || !head || !base) throw bad('Faltan el título o las ramas');
+  const pr = await gh(account, `/repos/${owner}/${name}/pulls`, { method: 'POST', body: { title: title.trim(), body, head: safeRef(head), base: safeRef(base), draft: !!draft } });
+  res.json({ ...pickPull(pr), output: `Pull request #${pr.number} creado` });
+});
+
 // ---------- vínculo con GitLab ----------
 // Deduce el proyecto de GitLab a partir del remoto "origin".
 r.get('/:id/gitlab-project', async (req, res) => {
   const repo = getRepo(req.params.id);
   if (repo.gitlabProjectId) {
-    return res.json((await api(`/projects/${repo.gitlabProjectId}`)).data);
+    const instance = repo.gitlabInstance || 'main';
+    return res.json({ ...(await api(`/projects/${repo.gitlabProjectId}`, { instance })).data, instance });
   }
   const url = await git.remoteUrl(repo.path);
   if (!url) throw bad('El repositorio no tiene remoto "origin"', 404);
-  const glHost = new URL(load().gitlab.url).host;
   const m = url.match(/^(?:https?:\/\/(?:[^@/]+@)?([^/]+)\/|git@([^:]+):|ssh:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/)(.+?)(?:\.git)?\/?$/);
-  if (!m || (m[1] || m[2] || m[3]) !== glHost) throw bad(`El remoto origin (${m ? m[1] || m[2] || m[3] : url}) no está en la instancia de GitLab configurada (${glHost})`, 404);
-  const { data } = await api(`/projects/${encodeURIComponent(m[4])}`);
-  update((c) => { const x = c.repos.find((y) => y.id === repo.id); if (x) x.gitlabProjectId = data.id; });
-  res.json(data);
+  const host = m ? (m[1] || m[2] || m[3]).toLowerCase() : null;
+  const inst = gitlabInstances().find((i) => { try { return new URL(i.url).host.toLowerCase() === host; } catch { return false; } });
+  if (!inst) throw bad(`El remoto origin (${host || url}) no está en ninguna instancia de GitLab configurada. Añádela en Cuentas.`, 404);
+  const { data } = await api(`/projects/${encodeURIComponent(m[4])}`, { instance: inst.id });
+  update((c) => { const x = c.repos.find((y) => y.id === repo.id); if (x) { x.gitlabProjectId = data.id; x.gitlabInstance = inst.id; } });
+  res.json({ ...data, instance: inst.id });
 });
 
 export default r;

@@ -9,6 +9,10 @@ import repoRoutes from './routes/repos.js';
 import fsRoutes from './routes/fs.js';
 import autoFetchRoutes from './routes/autofetch.js';
 import { start as startAutoFetch } from './autofetch.js';
+import accountRoutes from './routes/accounts.js';
+import githubRoutes from './routes/github.js';
+import oplogRoutes from './routes/oplog.js';
+import { middleware as oplog } from './oplog.js';
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -33,11 +37,17 @@ const wrap = (router) => {
   return router;
 };
 
+// Registro de operaciones: anota cada operación que modifica algo y su resultado.
+app.use('/api', oplog);
+
 app.use('/api/auth', wrap(authRoutes));
 app.use('/api/gitlab', wrap(gitlabRoutes));
 app.use('/api/repos', wrap(repoRoutes));
 app.use('/api/fs', wrap(fsRoutes));
 app.use('/api/auto-fetch', wrap(autoFetchRoutes));
+app.use('/api/accounts', wrap(accountRoutes));
+app.use('/api/github', wrap(githubRoutes));
+app.use('/api/oplog', wrap(oplogRoutes));
 
 // En producción sirve el frontend compilado.
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
