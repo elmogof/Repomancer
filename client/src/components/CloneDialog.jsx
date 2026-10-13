@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, TextField } from '@mui/material';
+import { getInstance } from '../gitlabInstance.js';
 import { api } from '../api/client.js';
 import PathField from './FolderPicker.jsx';
 
@@ -18,7 +19,7 @@ export default function CloneDialog({ open, onClose, onCloned, initialUrl = '', 
   const clone = async () => {
     setBusy(true); setError(null);
     try {
-      const repo = await api.post('/repos/clone', { url, dir, gitlabProjectId });
+      const repo = await api.post('/repos/clone', { url, dir, gitlabProjectId, gitlabInstance: gitlabProjectId ? getInstance() : undefined });
       onCloned(repo);
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }

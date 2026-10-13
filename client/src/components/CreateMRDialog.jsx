@@ -6,6 +6,7 @@ import {
 import { api } from '../api/client.js';
 
 export default function CreateMRDialog({ open, onClose, project, sourceBranch, onCreated }) {
+  const inst = `?instance=${encodeURIComponent(project?.instance || 'main')}`;
   const [branches, setBranches] = useState([]);
   const [form, setForm] = useState({});
   const [error, setError] = useState(null);
@@ -15,14 +16,14 @@ export default function CreateMRDialog({ open, onClose, project, sourceBranch, o
     if (!open || !project) return;
     setError(null);
     setForm({ source_branch: sourceBranch || '', target_branch: project.default_branch || 'main', title: '', description: '', remove_source_branch: true, squash: false, draft: false });
-    api.get(`/gitlab/projects/${project.id}/branches`).then((b) => setBranches(b.map((x) => x.name))).catch((e) => setError(e.message));
+    api.get(`/gitlab/projects/${project.id}/branches${inst}`).then((b) => setBranches(b.map((x) => x.name))).catch((e) => setError(e.message));
   }, [open, project, sourceBranch]);
 
   const set = (k) => (e, v) => setForm((f) => ({ ...f, [k]: v !== undefined && typeof v !== 'object' ? v : e?.target?.type === 'checkbox' ? e.target.checked : (v ?? e.target.value) }));
 
   const create = async () => {
     setBusy(true); setError(null);
-    try { onCreated(await api.post(`/gitlab/projects/${project.id}/merge_requests`, form)); }
+    try { onCreated(await api.post(`/gitlab/projects/${project.id}/merge_requests${inst}`, form)); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   };

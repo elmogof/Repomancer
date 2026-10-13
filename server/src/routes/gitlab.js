@@ -1,8 +1,18 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Router } from 'express';
-import { api } from '../gitlab.js';
+import { api as rawApi } from '../gitlab.js';
+import { gitlabInstances } from '../accounts.js';
 
 const r = Router();
 const enc = encodeURIComponent;
+
+// Cada petición puede indicar la instancia de GitLab con ?instance=<id> (por defecto, la principal).
+// AsyncLocalStorage la mantiene asociada a su propia petición aunque haya varias en paralelo.
+const ctx = new AsyncLocalStorage();
+r.use((req, res, next) => ctx.run(req.query.instance || 'main', next));
+const api = (pathname, opts = {}) => rawApi(pathname, { instance: ctx.getStore(), ...opts });
+
+r.get('/instances', (req, res) => res.json(gitlabInstances()));
 
 r.get('/projects', async (req, res) => {
   const { search, page = 1, membership = 'true' } = req.query;

@@ -1,4 +1,14 @@
-async function request(method, url, body) {
+import { getInstance } from '../gitlabInstance.js';
+
+// Las llamadas a /gitlab/… van a la instancia de GitLab activa, salvo que la URL ya indique una.
+function withInstance(url) {
+  if (!url.startsWith('/gitlab/') || /[?&]instance=/.test(url)) return url;
+  const inst = getInstance();
+  return inst === 'main' ? url : `${url}${url.includes('?') ? '&' : '?'}instance=${encodeURIComponent(inst)}`;
+}
+
+async function request(method, path, body) {
+  const url = withInstance(path);
   const res = await fetch(`/api${url}`, {
     method,
     headers: { 'X-Git-Manager': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },

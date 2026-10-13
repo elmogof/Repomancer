@@ -9,6 +9,8 @@ import CloneIcon from '@mui/icons-material/CloudDownload';
 import MergeIcon from '@mui/icons-material/CallMerge';
 import { api, qs } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
+import InstanceSelect from '../components/InstanceSelect.jsx';
+import { useGitlabInstance } from '../gitlabInstance.js';
 import CloneDialog from '../components/CloneDialog.jsx';
 
 export default function Projects() {
@@ -19,6 +21,7 @@ export default function Projects() {
   const [clone, setClone] = useState(null);
   const notify = useNotify();
   const navigate = useNavigate();
+  const instance = useGitlabInstance();
 
   const load = (page = 1, append = false) => {
     setLoading(true);
@@ -26,12 +29,13 @@ export default function Projects() {
       .then((d) => { setItems((prev) => (append ? [...prev, ...d.items] : d.items)); setNext(d.nextPage); })
       .catch((e) => notify(e.message, 'error')).finally(() => setLoading(false));
   };
-  useEffect(() => { const t = setTimeout(() => load(), 300); return () => clearTimeout(t); }, [search]);
+  useEffect(() => { const t = setTimeout(() => load(), 300); return () => clearTimeout(t); }, [search, instance]);
 
   return (
     <Box>
       <Stack direction="row" alignItems="center" sx={{ mb: 2 }} spacing={2}>
         <Typography variant="h5" sx={{ flexGrow: 1 }}>Proyectos GitLab</Typography>
+        <InstanceSelect />
         <TextField size="small" placeholder="Buscar proyecto…" value={search} onChange={(e) => setSearch(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ width: 320 }} />
       </Stack>

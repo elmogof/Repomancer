@@ -6,6 +6,8 @@ import {
 } from '@mui/material';
 import { api, qs } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
+import InstanceSelect from '../components/InstanceSelect.jsx';
+import { useGitlabInstance } from '../gitlabInstance.js';
 
 const STATE_COLOR = { opened: 'success', merged: 'info', closed: 'default' };
 const STATE_LABEL = { opened: 'Abierto', merged: 'Fusionado', closed: 'Cerrado' };
@@ -18,17 +20,19 @@ export default function MergeRequests() {
   const [items, setItems] = useState(null);
   const notify = useNotify();
   const navigate = useNavigate();
+  const instance = useGitlabInstance();
 
   useEffect(() => {
     setItems(null);
     const url = project ? `/gitlab/projects/${project}/merge_requests${qs({ state })}` : `/gitlab/merge_requests${qs({ state, scope })}`;
     api.get(url).then(setItems).catch((e) => { notify(e.message, 'error'); setItems([]); });
-  }, [project, state, scope]);
+  }, [project, state, scope, instance]);
 
   return (
     <Box>
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
         <Typography variant="h5" sx={{ flexGrow: 1 }}>Merge requests</Typography>
+        <InstanceSelect />
         {project && <Chip label={params.get('name') || `Proyecto ${project}`} onDelete={() => setParams({})} />}
         {!project && (
           <TextField select size="small" value={scope} onChange={(e) => setScope(e.target.value)} sx={{ width: 220 }}>

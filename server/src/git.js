@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { load } from './config.js';
 import { getValidToken } from './gitlab.js';
+import { accountForHost } from './accounts.js';
 
 function hostOf(url) {
   try { return new URL(url).host; } catch { return null; }
@@ -16,14 +17,19 @@ async function authEnv(remoteUrl) {
   const cfg = load();
   const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
   const glHost = hostOf(cfg.gitlab.url);
-  if (remoteUrl && glHost && hostOf(remoteUrl) === glHost) {
+  const host = remoteUrl && hostOf(remoteUrl);
+  const header = (origin, user, token) => {
+    env.GIT_CONFIG_COUNT = '1';
+    env.GIT_CONFIG_KEY_0 = `http.${origin}/.extraHeader`;
+    env.GIT_CONFIG_VALUE_0 = `Authorization: Basic ${Buffer.from(`${user}:${token}`).toString('base64')}`;
+  };
+  if (host && glHost && host === glHost) {
     const token = await getValidToken();
-    if (token) {
-      const basic = Buffer.from(`oauth2:${token}`).toString('base64');
-      env.GIT_CONFIG_COUNT = '1';
-      env.GIT_CONFIG_KEY_0 = `http.${new URL(cfg.gitlab.url).origin}/.extraHeader`;
-      env.GIT_CONFIG_VALUE_0 = `Authorization: Basic ${basic}`;
-    }
+    if (token) header(new URL(cfg.gitlab.url).origin, 'oauth2', token);
+  } else if (host) {
+    // Otra instancia de GitLab o GitHub con cuenta añadida: mismo mecanismo con su token.
+    const acc = accountForHost(host);
+    if (acc) header(new URL(acc.url).origin, acc.provider === 'github' ? 'x-access-token' : 'oauth2', acc.token);
   }
   return env;
 }

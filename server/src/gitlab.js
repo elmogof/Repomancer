@@ -1,6 +1,7 @@
 // Cliente de la API REST v4 de GitLab + flujo OAuth2 (authorization code + PKCE).
 import crypto from 'node:crypto';
 import { load, update } from './config.js';
+import { getAccount } from './accounts.js';
 
 export const PORT = Number(process.env.PORT || 4000);
 export const OAUTH_REDIRECT = `http://localhost:${PORT}/api/auth/oauth/callback`;
@@ -18,14 +19,17 @@ export async function getValidToken() {
   return load().gitlab.token;
 }
 
-export async function api(pathname, { method = 'GET', body, query, token } = {}) {
-  const t = token || (await getValidToken());
+// instance: id de una cuenta adicional de GitLab; sin ella (o "main") se usa la sesión principal.
+export async function api(pathname, { method = 'GET', body, query, token, instance } = {}) {
+  const extra = instance && instance !== 'main' ? getAccount(instance) : null;
+  if (extra && extra.provider !== 'gitlab') throw Object.assign(new Error('La cuenta no es de GitLab'), { status: 400 });
+  const t = token || extra?.token || (await getValidToken());
   if (!t) {
     const e = new Error('No has iniciado sesión en GitLab');
     e.status = 401;
     throw e;
   }
-  const url = new URL(`${base()}/api/v4${pathname}`);
+  const url = new URL(`${extra ? extra.url : base()}/api/v4${pathname}`);
   for (const [k, v] of Object.entries(query || {})) if (v !== undefined && v !== '') url.searchParams.set(k, v);
   const res = await fetch(url, {
     method,
