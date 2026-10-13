@@ -1,0 +1,15 @@
+{
+  "name": "git-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gestor local de repositorios Git y GitLab (React + Node + Material UI)",
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm:dev -w server\" \"npm:dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run build && npm start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
