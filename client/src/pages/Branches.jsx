@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Alert, Box, Button, Checkbox, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Grid,
-  IconButton, LinearProgress, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Paper, Stack, Switch, TextField, Tooltip, Typography,
+  IconButton, InputAdornment, LinearProgress, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Paper, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
 import CheckoutIcon from '@mui/icons-material/Login';
 import MergeIcon from '@mui/icons-material/CallMerge';
@@ -10,6 +10,8 @@ import CompareIcon from '@mui/icons-material/CompareArrows';
 import CleanIcon from '@mui/icons-material/CleaningServicesOutlined';
 import RefreshIcon from '@mui/icons-material/Sync';
 import ExpandIcon from '@mui/icons-material/ExpandMore';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Close';
 import { api } from '../api/client.js';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
@@ -156,6 +158,7 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   const [mergeTarget, setMergeTarget] = useState(null);
   const [noFf, setNoFf] = useState(false);
   const [cleanOpen, setCleanOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   const load = () => api.get(`/repos/${repoId}/branches`).then(setBranches).catch(() => {});
   useEffect(() => { load(); }, [repoId]);
@@ -166,9 +169,20 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   const create = () => act('checkout', () => api.post(`/repos/${repoId}/checkout`, { branch: name, create: true }), `Rama ${name} creada`).then((r) => { setNewOpen(false); setName(''); return done(r); });
   const merge = () => { const b = mergeTarget; setMergeTarget(null); act('merge', () => api.post(`/repos/${repoId}/merge`, { branch: b, noFf }), `Merge de ${b}`).then(done); };
 
-  const section = (title, list) => (
+  // Every word must appear in the branch name or its last commit message (case-insensitive).
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (b) => words.every((w) => b.name.toLowerCase().includes(w) || (b.subject || '').toLowerCase().includes(w));
+
+  const section = (title, all) => {
+    const list = all.filter(matches);
+    return (
     <Paper variant="outlined">
-      <List dense subheader={<ListSubheader>{title}</ListSubheader>}>
+      <List dense subheader={<ListSubheader>{title} ({words.length ? `${list.length} de ${all.length}` : all.length})</ListSubheader>}>
+        {list.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
+            {words.length ? 'Ninguna rama coincide con la búsqueda.' : 'No hay ramas.'}
+          </Typography>
+        )}
         {list.map((b) => (
           <ListItem key={b.name} divider secondaryAction={!b.current && (
             <Stack direction="row">
@@ -185,15 +199,23 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
         ))}
       </List>
     </Paper>
-  );
+    );
+  };
 
   return (
     <Box>
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap alignItems="center">
         <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setNewOpen(true)}>Nueva rama desde {current?.name}</Button>
         <Tooltip title="Detecta ramas ya fusionadas o cuyo remoto se borró y elimínalas en lote">
           <Button startIcon={<CleanIcon />} onClick={() => setCleanOpen(true)}>Limpiar ramas</Button>
         </Tooltip>
+        <TextField size="small" placeholder="Buscar ramas…" value={query} onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+          sx={{ ml: { sm: 'auto' }, width: { xs: '100%', sm: 300 } }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+            endAdornment: query && <InputAdornment position="end"><IconButton size="small" edge="end" aria-label="Limpiar búsqueda" onClick={() => setQuery('')}><ClearIcon fontSize="small" /></IconButton></InputAdornment>,
+          }} />
       </Stack>
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>{section('Locales', branches.filter((b) => !b.remote))}</Grid>
