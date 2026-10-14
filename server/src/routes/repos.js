@@ -547,6 +547,15 @@ r.post('/:id/push', async (req, res) => {
   res.json({ output: (stdout + stderr).trim() });
 });
 
+// Publica una rama local en origin (aunque no sea la actual) y la deja siguiendo a origin/<rama>.
+r.post('/:id/publish', async (req, res) => {
+  const repo = getRepo(req.params.id);
+  const branch = safeRef(req.body?.branch);
+  if (branch.startsWith('origin/')) throw bad('Esa ya es una rama remota');
+  const { stderr, stdout } = await git.runRemote(repo.path, ['push', '-u', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+  res.json({ output: (stdout + stderr).trim() });
+});
+
 // ---------- abrir en el sistema ----------
 r.post('/:id/open', async (req, res) => {
   const repo = getRepo(req.params.id);
@@ -650,10 +659,14 @@ r.post('/:id/branches/delete', async (req, res) => {
 
 r.post('/:id/checkout', async (req, res) => {
   const repo = getRepo(req.params.id);
-  const { branch, create, from } = req.body || {};
+  const { branch, create, from, switchTo = true } = req.body || {};
   safeRef(branch);
-  if (create) await git.run(repo.path, ['switch', '-c', branch, ...(from ? [safeRef(from)] : [])]);
-  else if (branch.startsWith('origin/')) {
+  if (create) {
+    // --no-track: una rama nueva creada desde origin/x no debe seguir a origin/x; al publicarla tendrá su propio remoto.
+    const base = from ? [safeRef(from)] : [];
+    if (switchTo) await git.run(repo.path, ['switch', '--no-track', '-c', branch, ...base]);
+    else await git.run(repo.path, ['branch', '--no-track', branch, ...base]);
+  } else if (branch.startsWith('origin/')) {
     // rama remota → crea la local que la sigue
     await git.run(repo.path, ['switch', '--track', branch]);
   } else await git.run(repo.path, ['switch', branch]);

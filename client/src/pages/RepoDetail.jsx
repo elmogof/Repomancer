@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import PullIcon from '@mui/icons-material/Download';
 import PushIcon from '@mui/icons-material/Upload';
+import PublishIcon from '@mui/icons-material/CloudUploadOutlined';
 import FetchIcon from '@mui/icons-material/Sync';
 import MergeIcon from '@mui/icons-material/CallMerge';
 import WebIcon from '@mui/icons-material/OpenInNew';
@@ -49,6 +50,7 @@ const FAIL = {
   fetch: 'Fetch falló', pull: 'Pull falló', push: 'Push falló', commit: 'No se pudo crear el commit', stage: 'No se pudo actualizar el área de preparación',
   abort: 'No se pudo abortar', checkout: 'No se pudo cambiar de rama', merge: 'Merge falló', stash: 'Operación de stash fallida', tag: 'Operación de tag fallida',
   revert: 'Revert falló', 'cherry-pick': 'Cherry-pick falló', operation: 'No se pudo continuar', undo: 'No se pudo deshacer el commit',
+  publish: 'No se pudo publicar la rama', 'branch-delete': 'No se pudo eliminar la rama',
 };
 const LOCAL_CHANGES_RE = /would be overwritten by (merge|checkout)|untracked working tree files would be|cannot pull with rebase: You have unstaged changes|Please commit or stash them/i;
 
@@ -270,7 +272,14 @@ export default function RepoDetail() {
           <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 24 }, wordBreak: 'break-word', minWidth: 0 }}>{st.name}</Typography>
           <Chip label={st.branch} color="primary" variant="outlined" sx={{ maxWidth: { xs: '100%', sm: 360 } }} />
           {st.upstream ? <Typography variant="body2" color="text.secondary">→ {st.upstream} {st.ahead > 0 && `↑${st.ahead}`} {st.behind > 0 && `↓${st.behind}`}</Typography>
-            : <Chip size="small" label="Sin publicar" />}
+            : st.branch && st.branch !== '(detached)' ? (
+              <Tooltip title={`La rama no existe en origin. Publicarla: push -u origin ${st.branch}`}>
+                <Button size="small" variant="outlined" color="warning" startIcon={<PublishIcon />} disabled={!!busy}
+                  onClick={() => act('publish', () => api.post(`/repos/${id}/publish`, { branch: st.branch }), `Rama ${st.branch} publicada en origin`)}>
+                  Publicar rama
+                </Button>
+              </Tooltip>
+            ) : <Chip size="small" label="Sin publicar" />}
           <Box sx={{ flexGrow: 1 }} />
           <ButtonGroup variant="outlined" size={compact ? 'small' : 'medium'} sx={{ '& .MuiButton-startIcon': compact ? { mr: 0.5 } : {} }}>
             <Tooltip title="Fetch (F)">

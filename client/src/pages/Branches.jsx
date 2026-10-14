@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Grid,
+  Alert, Autocomplete, Box, Button, Checkbox, Chip, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Grid,
   IconButton, InputAdornment, LinearProgress, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Paper, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
 import CheckoutIcon from '@mui/icons-material/Login';
@@ -12,6 +12,9 @@ import RefreshIcon from '@mui/icons-material/Sync';
 import ExpandIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Close';
+import BranchFromIcon from '@mui/icons-material/AltRoute';
+import PublishIcon from '@mui/icons-material/CloudUploadOutlined';
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api/client.js';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
@@ -151,10 +154,70 @@ function CleanupDialog({ open, repoId, onClose, act, onDone, notify }) {
   );
 }
 
+const PUBLISH_KEY = 'gm-new-branch-publish';
+const storedPublish = () => { try { return localStorage.getItem(PUBLISH_KEY) === '1'; } catch { return false; } };
+
+// Crea una rama desde cualquier rama local o remota; opcionalmente cambia a ella y la publica en origin.
+function NewBranchDialog({ open, base: initialBase, branches, onClose, onCreate }) {
+  const [name, setName] = useState('');
+  const [base, setBase] = useState(initialBase);
+  const [switchTo, setSwitchTo] = useState(true);
+  const [publish, setPublish] = useState(storedPublish);
+  useEffect(() => { if (open) { setName(''); setBase(initialBase); } }, [open, initialBase]);
+
+  const options = useMemo(() => [...branches].sort((a, b) => (a.remote - b.remote) || (b.current - a.current) || a.name.localeCompare(b.name)), [branches]);
+  const exists = branches.some((b) => !b.remote && b.name === name);
+  const invalid = !!name && /^[-/.]|[/.]$|\.\.|\/\/|@\{|\.lock$/.test(name);
+  const canCreate = name && base && !exists && !invalid;
+  const submit = () => {
+    if (!canCreate) return;
+    try { localStorage.setItem(PUBLISH_KEY, publish ? '1' : '0'); } catch { /* sin almacenamiento */ }
+    onCreate({ name, from: base, switchTo, publish });
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Nueva rama</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <TextField autoFocus fullWidth label="Nombre" placeholder="feature/mi-cambio" value={name}
+            onChange={(e) => setName(e.target.value.replace(/\s+/g, '-').replace(/[~^:?*[\\]/g, ''))}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            error={exists || invalid} helperText={exists ? 'Ya existe una rama local con ese nombre' : invalid ? 'Nombre de rama no válido' : 'Los espacios se convierten en guiones'} />
+          <Autocomplete options={options} groupBy={(b) => (b.remote ? 'Remotas' : 'Locales')} getOptionLabel={(b) => b.name}
+            value={options.find((b) => b.name === base) || null} onChange={(e, b) => setBase(b?.name || '')}
+            isOptionEqualToValue={(a, b) => a.name === b.name} disableClearable
+            renderOption={({ key, ...props }, b) => (
+              <Box component="li" key={b.name} {...props}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2">{b.name}</Typography>{b.current && <Chip size="small" color="primary" label="actual" sx={{ height: 18 }} />}
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary" noWrap component="div">{b.subject}</Typography>
+                </Box>
+              </Box>
+            )}
+            renderInput={(params) => <TextField {...params} label="Crear desde" helperText="Rama local o remota en la que se basa la nueva rama" />} />
+          <Box>
+            <FormControlLabel control={<Checkbox checked={switchTo} onChange={(e) => setSwitchTo(e.target.checked)} />} label="Cambiar a la nueva rama" />
+            <FormControlLabel control={<Checkbox checked={publish} onChange={(e) => setPublish(e.target.checked)} />} label="Publicarla en origin (push -u)" />
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" disabled={!canCreate} onClick={submit}>
+          {publish ? (switchTo ? 'Crear, cambiar y publicar' : 'Crear y publicar') : (switchTo ? 'Crear y cambiar' : 'Crear')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function Branches({ repoId, onChanged, act, onCompare, notify }) {
   const [branches, setBranches] = useState([]);
-  const [newOpen, setNewOpen] = useState(false);
-  const [name, setName] = useState('');
+  const [newFrom, setNewFrom] = useState(null); // rama base del diálogo de nueva rama; null = cerrado
+  const [toDelete, setToDelete] = useState(null); // { name, force } rama local a eliminar
   const [mergeTarget, setMergeTarget] = useState(null);
   const [noFf, setNoFf] = useState(false);
   const [cleanOpen, setCleanOpen] = useState(false);
@@ -166,7 +229,25 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   const current = branches.find((b) => b.current);
   const done = async (r) => { await load(); onChanged(); return r; };
   const checkout = (branch) => act('checkout', () => api.post(`/repos/${repoId}/checkout`, { branch }), `Cambiado a ${branch}`).then(done);
-  const create = () => act('checkout', () => api.post(`/repos/${repoId}/checkout`, { branch: name, create: true }), `Rama ${name} creada`).then((r) => { setNewOpen(false); setName(''); return done(r); });
+  const publish = (branch) => act('publish', () => api.post(`/repos/${repoId}/publish`, { branch }), `Rama ${branch} publicada en origin`).then(done);
+  // Borra una rama local con -d; si git avisa de que no está fusionada, se ofrece forzar (-D).
+  const remove = async () => {
+    const { name, force } = toDelete;
+    setToDelete(null);
+    const r = await act('branch-delete', () => api.post(`/repos/${repoId}/branches/delete`, { local: [name], force: force ? [name] : [], allowProtected: true }));
+    const res = r?.results?.[0];
+    if (!res) return;
+    if (res.ok) notify(`Rama ${name} eliminada`, 'success');
+    else if (/not fully merged|no está fusionada|not merged/i.test(res.error)) setToDelete({ name, force: true });
+    else notify(res.error, 'error', { title: `No se pudo eliminar ${name}` });
+    done();
+  };
+  const create = async ({ name, from, switchTo, publish: pub }) => {
+    setNewFrom(null);
+    const r = await act('checkout', () => api.post(`/repos/${repoId}/checkout`, { branch: name, create: true, from, switchTo }), `Rama ${name} creada desde ${from}`);
+    await done(r);
+    if (r && pub) await publish(name);
+  };
   const merge = () => { const b = mergeTarget; setMergeTarget(null); act('merge', () => api.post(`/repos/${repoId}/merge`, { branch: b, noFf }), `Merge de ${b}`).then(done); };
 
   // Every word must appear in the branch name or its last commit message (case-insensitive).
@@ -184,17 +265,30 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
           </Typography>
         )}
         {list.map((b) => (
-          <ListItem key={b.name} divider secondaryAction={!b.current && (
+          <ListItem key={b.name} divider secondaryAction={(
             <Stack direction="row">
-              <Tooltip title="Cambiar a esta rama (checkout)"><IconButton size="small" onClick={() => checkout(b.name)}><CheckoutIcon fontSize="small" /></IconButton></Tooltip>
-              <Tooltip title={`Comparar con ${current?.name}`}><IconButton size="small" onClick={() => onCompare(current?.name, b.name)}><CompareIcon fontSize="small" /></IconButton></Tooltip>
-              <Tooltip title={`Fusionar en ${current?.name}`}><IconButton size="small" onClick={() => setMergeTarget(b.name)}><MergeIcon fontSize="small" /></IconButton></Tooltip>
+              {!b.remote && !b.upstream && (
+                <Tooltip title="Publicar en origin (push -u)"><IconButton size="small" color="primary" onClick={() => publish(b.name)}><PublishIcon fontSize="small" /></IconButton></Tooltip>
+              )}
+              <Tooltip title="Nueva rama desde esta"><IconButton size="small" onClick={() => setNewFrom(b.name)}><BranchFromIcon fontSize="small" /></IconButton></Tooltip>
+              {!b.current && <>
+                <Tooltip title="Cambiar a esta rama (checkout)"><IconButton size="small" onClick={() => checkout(b.name)}><CheckoutIcon fontSize="small" /></IconButton></Tooltip>
+                <Tooltip title={`Comparar con ${current?.name}`}><IconButton size="small" onClick={() => onCompare(current?.name, b.name)}><CompareIcon fontSize="small" /></IconButton></Tooltip>
+                <Tooltip title={`Fusionar en ${current?.name}`}><IconButton size="small" onClick={() => setMergeTarget(b.name)}><MergeIcon fontSize="small" /></IconButton></Tooltip>
+              </>}
+              {!b.remote && !b.current && (
+                <Tooltip title="Eliminar rama local"><IconButton size="small" color="error" onClick={() => setToDelete({ name: b.name, force: false })}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+              )}
             </Stack>
           )}>
             <ListItemText
-              primary={<Stack direction="row" spacing={1} alignItems="center"><span>{b.name}</span>{b.current && <Chip size="small" color="primary" label="actual" />}</Stack>}
+              primary={<Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+                <span>{b.name}</span>
+                {b.current && <Chip size="small" color="primary" label="actual" />}
+                {!b.remote && !b.upstream && <Chip size="small" variant="outlined" label="sin publicar" sx={{ height: 20, fontSize: 11 }} />}
+              </Stack>}
               secondary={`${b.subject || ''} · ${b.date ? new Date(b.date).toLocaleDateString('es-CR') : ''}`}
-              secondaryTypographyProps={{ noWrap: true }} sx={{ pr: 12 }} />
+              secondaryTypographyProps={{ noWrap: true }} sx={{ pr: (b.current ? 5 : 17) + (!b.remote && !b.upstream ? 4 : 0) + (!b.remote && !b.current ? 4 : 0) }} />
           </ListItem>
         ))}
       </List>
@@ -205,7 +299,14 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   return (
     <Box>
       <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap alignItems="center">
-        <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setNewOpen(true)}>Nueva rama desde {current?.name}</Button>
+        <Tooltip title="En el diálogo puedes elegir otra rama base; también desde el botón de cada rama">
+          <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setNewFrom(current?.name || '')}>Nueva rama desde {current?.name}</Button>
+        </Tooltip>
+        {current && !current.upstream && (
+          <Tooltip title={`La rama actual no existe en origin. Publicarla: push -u origin ${current.name}`}>
+            <Button variant="outlined" color="warning" startIcon={<PublishIcon />} onClick={() => publish(current.name)}>Publicar {current.name}</Button>
+          </Tooltip>
+        )}
         <Tooltip title="Detecta ramas ya fusionadas o cuyo remoto se borró y elimínalas en lote">
           <Button startIcon={<CleanIcon />} onClick={() => setCleanOpen(true)}>Limpiar ramas</Button>
         </Tooltip>
@@ -221,11 +322,13 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
         <Grid item xs={12} md={6}>{section('Locales', branches.filter((b) => !b.remote))}</Grid>
         <Grid item xs={12} md={6}>{section('Remotas', branches.filter((b) => b.remote))}</Grid>
       </Grid>
-      <Dialog open={newOpen} onClose={() => setNewOpen(false)}>
-        <DialogTitle>Nueva rama</DialogTitle>
-        <DialogContent><TextField autoFocus fullWidth margin="dense" label="Nombre" placeholder="feature/mi-cambio" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name && create()} /></DialogContent>
-        <DialogActions><Button onClick={() => setNewOpen(false)}>Cancelar</Button><Button variant="contained" disabled={!name} onClick={create}>Crear y cambiar</Button></DialogActions>
-      </Dialog>
+      <ConfirmDialog open={!!toDelete} color="error" title={toDelete?.force ? 'La rama no está fusionada' : 'Eliminar rama local'}
+        confirm={toDelete?.force ? 'Eliminar de todos modos' : 'Eliminar'}
+        body={toDelete?.force
+          ? <>«{toDelete?.name}» tiene commits que no están en ninguna otra rama. Si la eliminas, esos commits se perderán (salvo que existan en origin).</>
+          : <>Se eliminará la rama local «{toDelete?.name}». {branches.find((b) => b.name === toDelete?.name)?.upstream ? 'La rama en origin no se toca.' : 'No está publicada en origin.'}</>}
+        onClose={() => setToDelete(null)} onConfirm={remove} />
+      <NewBranchDialog open={newFrom != null} base={newFrom || ''} branches={branches} onClose={() => setNewFrom(null)} onCreate={create} />
       <Dialog open={!!mergeTarget} onClose={() => setMergeTarget(null)}>
         <DialogTitle>Fusionar «{mergeTarget}» en «{current?.name}»</DialogTitle>
         <DialogContent><FormControlLabel control={<Checkbox checked={noFf} onChange={(e) => setNoFf(e.target.checked)} />} label="Crear siempre commit de merge (--no-ff)" /></DialogContent>
