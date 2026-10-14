@@ -4,6 +4,7 @@ import { Box, Dialog, InputAdornment, InputBase, List, ListItemButton, ListItemI
 import { alpha, useTheme } from '@mui/material/styles';
 import CommandIcon from '@mui/icons-material/KeyboardCommandKey';
 import FolderIcon from '@mui/icons-material/FolderOutlined';
+import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import { api } from '../api/client.js';
 
 // Registro de comandos: cada pantalla registra los suyos mientras está montada (useCommands).
@@ -91,12 +92,14 @@ function CommandPalette({ open, onClose, commands }) {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const [repos, setRepos] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
   const listRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     setQ(''); setSel(0);
     api.get('/repos/index').then(setRepos).catch(() => setRepos([]));
+    api.get('/workspaces').then((d) => setWorkspaces(d.groups)).catch(() => setWorkspaces([]));
   }, [open]);
 
   const items = useMemo(() => {
@@ -107,8 +110,13 @@ function CommandPalette({ open, onClose, commands }) {
     const repoItems = words.length ? repos.filter((r) => !r.missing && match(`repositorio ${r.name} ${r.branch || ''}`)).slice(0, 8).map((r) => ({
       id: `repo:${r.id}`, group: 'Abrir repositorio', title: r.name, hint: r.branch, icon: <FolderIcon fontSize="small" />, run: () => navigate(`/repos/${r.id}`),
     })) : [];
-    return [...cmds, ...repoItems];
-  }, [q, commands, repos, navigate]);
+    // Entornos de trabajo: «Portal Clientes → QA» abre la vista previa del cambio.
+    const envItems = words.length ? workspaces.flatMap((g) => g.envs.map((e) => ({
+      id: `ws:${g.id}:${e.id}`, group: 'Cambiar entorno de trabajo', title: `${g.name} → ${e.name}`, icon: <WorkspacesIcon fontSize="small" />,
+      run: () => navigate(`/workspaces?switch=${g.id}:${e.id}`),
+    }))).filter((c) => match(`entorno ${c.title}`)).slice(0, 8) : [];
+    return [...cmds, ...envItems, ...repoItems];
+  }, [q, commands, repos, workspaces, navigate]);
 
   useEffect(() => { setSel(0); }, [q]);
   useEffect(() => { listRef.current?.querySelector('.Mui-selected')?.scrollIntoView({ block: 'nearest' }); }, [sel]);

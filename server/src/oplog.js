@@ -76,8 +76,8 @@ const LABELS = [
   [/^(PUT|POST) \/api\/(gitlab|github)\/.*\/(merge|approve|close|notes)$/, 'mr-action', 'Acción en merge/pull request'],
 ];
 // Rutas que cambian datos pero no merecen registro (preferencias, metadatos, sesión).
-// (El fetch automático, también el lanzado a mano, lo registra el propio ciclo.)
-const SKIP = /^(POST \/api\/auto-fetch\/run|PUT \/api\/repos\/[^/]+\/meta|POST \/api\/repos\/meta-many|PUT \/api\/auto-fetch|POST \/api\/repos\/[^/]+\/suggest-message|.* \/api\/auth\/|.* \/api\/fs\/|.* \/api\/accounts)/;
+// (El fetch automático, también el lanzado a mano, lo registra el propio ciclo; el cambio de entorno de trabajo anota cada repositorio.)
+const SKIP = /^(POST \/api\/auto-fetch\/run|PUT \/api\/repos\/[^/]+\/meta|POST \/api\/repos\/meta-many|PUT \/api\/auto-fetch|POST \/api\/repos\/[^/]+\/suggest-message|.* \/api\/auth\/|.* \/api\/fs\/|.* \/api\/accounts|.* \/api\/workspaces)/;
 
 // Middleware: registra cada operación que modifica algo, con su resultado y la salida de git.
 export function middleware(req, res, next) {

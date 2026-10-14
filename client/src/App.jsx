@@ -17,6 +17,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import CollapseIcon from '@mui/icons-material/KeyboardDoubleArrowLeft';
 import ExpandIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import CommandIcon from '@mui/icons-material/KeyboardCommandKey';
+import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import { api } from './api/client.js';
 import Login from './pages/Login.jsx';
 import RepoSearch from './components/RepoSearch.jsx';
@@ -30,6 +31,7 @@ import MergeRequestDetail from './pages/MergeRequestDetail.jsx';
 import PullRequests from './pages/PullRequests.jsx';
 import OpLog from './pages/OpLog.jsx';
 import Accounts from './pages/Accounts.jsx';
+import Workspaces from './pages/Workspaces.jsx';
 
 const DRAWER = 250;
 const DRAWER_MINI = 68;
@@ -46,6 +48,7 @@ function RepoDetailKeyed() {
 }
 const nav = [
   { to: '/repos', label: 'Repositorios locales', icon: <FolderIcon /> },
+  { to: '/workspaces', label: 'Entornos de trabajo', icon: <WorkspacesIcon /> },
   { to: '/projects', label: 'Proyectos GitLab', icon: <CloudIcon /> },
   { to: '/merge-requests', label: 'Merge requests', icon: <MergeIcon /> },
   { to: '/pull-requests', label: 'Pull requests (GitHub)', icon: <GitHubIcon /> },
@@ -179,6 +182,7 @@ export default function App({ mode, onToggleMode }) {
           <Routes>
             <Route path="/repos" element={<Repos />} />
             <Route path="/repos/:id" element={<RepoDetailKeyed />} />
+            <Route path="/workspaces" element={<Workspaces />} />
             <Route path="/projects" element={needsGitlab(<Projects />)} />
             <Route path="/merge-requests" element={needsGitlab(<MergeRequests />)} />
             <Route path="/projects/:pid/merge-requests/:iid" element={needsGitlab(<MergeRequestDetail />)} />

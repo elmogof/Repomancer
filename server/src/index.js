@@ -12,6 +12,7 @@ import { start as startAutoFetch } from './autofetch.js';
 import accountRoutes from './routes/accounts.js';
 import githubRoutes from './routes/github.js';
 import oplogRoutes from './routes/oplog.js';
+import workspaceRoutes from './routes/workspaces.js';
 import { middleware as oplog } from './oplog.js';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/auto-fetch', wrap(autoFetchRoutes));
 app.use('/api/accounts', wrap(accountRoutes));
 app.use('/api/github', wrap(githubRoutes));
 app.use('/api/oplog', wrap(oplogRoutes));
+app.use('/api/workspaces', wrap(workspaceRoutes));
 
 // En producción sirve el frontend compilado.
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
