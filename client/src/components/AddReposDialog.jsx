@@ -62,10 +62,11 @@ export default function AddReposDialog({ open, onClose, onAdded }) {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Elige una carpeta y se buscarán todos los repositorios git válidos que contenga, a cualquier profundidad (incluidos repos anidados). Se ignoran los repositorios vacíos sin commits ni remoto.
         </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'flex-start' }}>
-          <PathField autoFocus fullWidth margin="dense" label="Carpeta" placeholder="C:\\proyectos" value={root} onChange={setRoot}
+        {/* Sin márgenes propios: el botón se estira a la altura exacta del campo. */}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="stretch" sx={{ pt: 1 }}>
+          <PathField autoFocus fullWidth label="Carpeta" placeholder="C:\\proyectos" value={root} onChange={setRoot}
             onKeyDown={(e) => e.key === 'Enter' && root && search()} pickerTitle="Carpeta donde buscar repositorios" />
-          <Button variant="contained" startIcon={<RadarIcon />} onClick={search} disabled={!root || !!busy} sx={{ mt: { sm: '8px !important' }, height: 56, flexShrink: 0 }}>Buscar</Button>
+          <Button variant="contained" startIcon={<RadarIcon />} onClick={search} disabled={!root || !!busy} sx={{ flexShrink: 0, minHeight: 40, px: 2.5 }}>Buscar</Button>
         </Stack>
 
         {busy && <LinearProgress sx={{ mt: 2 }} />}
