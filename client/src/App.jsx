@@ -159,6 +159,8 @@ export default function App({ mode, onToggleMode }) {
         )}
         <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2, md: 3 }, minWidth: 0 }}>
           <Toolbar />
+          {/* Cada pantalla entra con una transición corta al navegar. */}
+          <Box key={loc.pathname} className="gm-enter">
           <Routes>
             <Route path="/repos" element={<Repos />} />
             <Route path="/repos/:id" element={<RepoDetailKeyed />} />
@@ -170,6 +172,7 @@ export default function App({ mode, onToggleMode }) {
             <Route path="/accounts" element={<Accounts />} />
             <Route path="*" element={<Navigate to="/repos" replace />} />
           </Routes>
+          </Box>
         </Box>
       </Box>
     </CommandsProvider>

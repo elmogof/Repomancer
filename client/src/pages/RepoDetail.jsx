@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Alert, Box, Button, ButtonGroup, Checkbox, Chip, CircularProgress, Divider,
+  Alert, Box, Button, ButtonGroup, Checkbox, Chip, CircularProgress, Divider, Skeleton,
   FormControlLabel, IconButton, LinearProgress, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem, Paper,
   Radio, Stack, Tab, Tabs, Tooltip, Typography, useMediaQuery,
 } from '@mui/material';
@@ -54,11 +54,15 @@ const FAIL = {
 };
 const LOCAL_CHANGES_RE = /would be overwritten by (merge|checkout)|untracked working tree files would be|cannot pull with rebase: You have unstaged changes|Please commit or stash them/i;
 
+const statusCache = new Map();
+
 export default function RepoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const [st, setSt] = useState(null);
+  // El último estado conocido se muestra al instante al volver al repo, mientras se actualiza.
+  const [st, setStState] = useState(() => statusCache.get(id) || null);
+  const setSt = useCallback((s) => { statusCache.set(id, s); setStState(s); }, [id]);
   const [tab, setTab] = useState(0);
   const [busy, setBusy] = useState(null);
   const [selected, setSelected] = useState(null); // { path, staged, untracked }
@@ -84,7 +88,7 @@ export default function RepoDetail() {
   const mobile = useMediaQuery((t) => t.breakpoints.down('md'));
   const compact = useMediaQuery((t) => t.breakpoints.down('sm'));
 
-  const load = useCallback(() => api.get(`/repos/${id}/status`).then(setSt).catch((e) => notify(e.message, 'error')), [id, notify]);
+  const load = useCallback(() => api.get(`/repos/${id}/status`).then(setSt).catch((e) => notify(e.message, 'error')), [id, notify, setSt]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     const onFocus = () => load();
@@ -231,7 +235,20 @@ export default function RepoDetail() {
     ...['Cambios', 'Historial', 'Ramas', 'Comparar', 'Archivos', 'Stash', 'Tags'].map((t, i) => ({ id: `tab:${i}`, group: 'Pestañas', title: `Ir a ${t}`, keys: String(i + 1), run: () => goTab(i) })),
   ] : []), [st, busy, pullPrefs, canStash, ghAccount]);
 
-  if (!st) return <CircularProgress />;
+  // Mientras carga se muestra la silueta de la pantalla en vez de un spinner, para que no haya saltos.
+  if (!st) return (
+    <Box>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
+        <Skeleton variant="circular" width={32} height={32} /><Skeleton width={180} height={36} /><Skeleton variant="rounded" width={220} height={28} />
+        <Box sx={{ flexGrow: 1 }} /><Skeleton variant="rounded" width={320} height={40} />
+      </Stack>
+      <Skeleton width={360} sx={{ mb: 2 }} />
+      <Skeleton variant="rounded" height={44} sx={{ mb: 2 }} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px 1fr' }, gap: 2 }}>
+        <Skeleton variant="rounded" height={360} /><Skeleton variant="rounded" height={360} />
+      </Box>
+    </Box>
+  );
   const conflicts = st.files.filter((f) => f.conflict);
   const staged = st.files.filter((f) => f.staged && !f.conflict);
   const unstaged = st.files.filter((f) => f.unstaged && !f.conflict);
@@ -361,7 +378,7 @@ export default function RepoDetail() {
         </Box>
       </Box>
 
-      <Box sx={{ flex: 1, minHeight: 0, overflow: { md: tab === 0 ? 'hidden' : 'auto' } }}>
+      <Box key={tab} className="gm-enter" sx={{ flex: 1, minHeight: 0, overflow: { md: tab === 0 ? 'hidden' : 'auto' } }}>
         {tab === 0 && (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: 2, height: { md: '100%' } }}>
             <Stack spacing={2} sx={{ minHeight: 0, overflow: { md: 'auto' }, display: mobile && (conflictSel || commitSel || selected) ? 'none' : 'flex' }}>

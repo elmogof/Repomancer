@@ -69,6 +69,10 @@ export default function buildTheme(mode) {
           // Reserva siempre el hueco de la barra de desplazamiento: si una lista se acorta (p. ej. al filtrar),
           // la página no se desplaza a los lados al desaparecer la barra.
           html: { scrollbarGutter: 'stable' },
+          // Entrada suave de pantallas y pestañas: aparece y sube unos píxeles.
+          '@keyframes gm-enter': { from: { opacity: 0, transform: 'translateY(6px)' }, to: { opacity: 1, transform: 'none' } },
+          '.gm-enter': { animation: 'gm-enter .22s cubic-bezier(.2,.7,.3,1) both' },
+          '@media (prefers-reduced-motion: reduce)': { '.gm-enter': { animation: 'none' } },
           body: {
             backgroundColor: dark ? '#0B0D0E' : '#fff',
             backgroundImage: dark
