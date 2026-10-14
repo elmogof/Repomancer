@@ -11,6 +11,7 @@ A local web app to manage all your Git repositories in one place, with built-in 
 ## Table of contents
 
 - [Features](#features)
+  - [Work environments](#work-environments-entornos-de-trabajo)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Running the app](#running-the-app)
@@ -41,12 +42,31 @@ A local web app to manage all your Git repositories in one place, with built-in 
   - the search survives navigation and page reloads.
 - Status filters (with changes, behind, ahead, unpublished), plus **favorites** (always shown first) and colored **labels** to group repositories by client, project or team.
 - Sort by name or by last commit date. The sort order and filters are remembered.
-- Bulk actions on selected repositories: fetch, pull, favorite, labels, and remove from the list (files on disk are never deleted).
+- Bulk actions on selected repositories, from a bar that stays at the bottom of the window while you scroll: fetch, pull, favorite, labels, create a group, and remove from the list (files on disk are never deleted).
 - Quick actions per repository:
   - pull, push and fetch;
   - open the folder, VS Code or a terminal;
   - open the web page;
   - copy the path.
+
+### Work environments (Entornos de trabajo)
+
+For apps made of several repositories, where each environment uses different branch names in each repository.
+
+- **Groups:** a group gathers the repositories that make up one app. A repository can belong to several groups.
+- **Environments:** each group has environments (production, QA, a feature…) that store one branch per repository. Names don't need to match: `api` can use `qa` while `web` uses `test`. A repository without a branch in an environment is left as it is.
+- **Quick setup:** create an environment from the branches the repositories are on now, duplicate another one, or fill it in by hand with each repository's branch list.
+- **One-click switch** with a preview first. For each repository it shows:
+  - current and target branch;
+  - uncommitted changes;
+  - branches that only exist on origin (a local tracking branch is created);
+  - branches that no longer exist (pick another one or skip the repository, and optionally save the choice).
+- **Uncommitted changes:** saved in a dedicated stash and restored automatically when you return to that branch. You can also skip those repositories or carry the changes over.
+- **Fetch before and pull after** switching, fast-forward only, so a switch never creates a merge.
+- **Undo:** "Volver al estado anterior" puts every repository back on the branch it had before the last switch.
+- The group card shows a repository × environment table, the active environment, and how many repositories drifted from it.
+- Cards can be collapsed to just the name, status and environment buttons (switching still takes one click). Each card remembers its state, and you can collapse or expand them all at once.
+- Switch from the command palette ("Portal → QA"). Each switch is recorded in the operation log.
 
 ### Repository detail
 
@@ -157,6 +177,50 @@ Both the task and `npm run dev` use port 4000. Run `npm run startup:stop` before
 
 On the login screen, choose **GitLab** or **GitHub**. You can connect the other one later from the avatar menu or from **Cuentas** (accounts). If you sign in only with GitHub, the GitLab screens ask you to connect GitLab.
 
+### Built-in sign-in apps (gitlab.com and github.com)
+
+If `oauth-apps.json` at the project root contains Client IDs, people who use **gitlab.com** or **github.com** only click "Iniciar sesión" and never see any setup steps. These IDs are public by design: GitLab OAuth uses PKCE and the GitHub device flow uses no secret, and each person's token still stays only on their own computer. A "Usar otro Application ID" / "Usar otro Client ID" link lets anyone use their own app instead, and self-hosted GitLab servers use their own app (see below).
+
+The login screen works the same way for both providers:
+
+- It signs in to **gitlab.com** or **github.com** by default. The server address field only appears after clicking "¿GitLab propio (self-managed)?" or "¿GitHub Enterprise?".
+- The Application ID or Client ID you use is **remembered per server** after a successful sign-in, so next time that server only needs one click.
+
+```json
+{
+  "gitlab": { "url": "https://gitlab.com", "clientId": "<GitLab Application ID>" },
+  "github": { "url": "https://github.com", "clientId": "<GitHub Client ID>" }
+}
+```
+
+`"gitlab"` can also be a list, to add a self-hosted GitLab (for example your company's) whose app you registered there:
+
+```json
+"gitlab": [
+  { "url": "https://gitlab.com", "clientId": "<gitlab.com Application ID>" },
+  { "url": "https://gitlab.example.com", "clientId": "<Application ID registered on that server>" }
+]
+```
+
+You can also set them with the environment variables `GIT_MANAGER_GITLAB_CLIENT_ID` and `GIT_MANAGER_GITHUB_CLIENT_ID`.
+
+**Creating the gitlab.com app** (once, by the maintainer):
+
+1. Sign in to gitlab.com and open **Edit profile → Applications** (<https://gitlab.com/-/user_settings/applications>), then click **Add new application**.
+2. **Name:** `Git Manager`. People see this name when they authorize the app.
+3. **Redirect URI:** `http://localhost:4000/api/auth/oauth/callback`
+4. **Confidential:** unchecked.
+5. **Scopes:** `api`, `read_user`, `read_repository`, `write_repository`
+6. Click **Save application** and copy the **Application ID** into `oauth-apps.json`. The secret is not used.
+
+**Creating the github.com app** (once, by the maintainer):
+
+1. Open **Settings → Developer settings → OAuth Apps → New OAuth App** (<https://github.com/settings/applications/new>).
+2. **Application name:** `Git Manager`. **Homepage URL:** your repository URL, for example `https://github.com/elmogof/Git-Manager-Local-Remote`.
+3. **Authorization callback URL:** `http://localhost:4000`. It isn't used by the device flow, but GitHub requires one.
+4. Click **Register application**, check **Enable Device Flow**, and click **Update application**.
+5. Copy the **Client ID** into `oauth-apps.json`. Don't generate a client secret; it isn't needed.
+
 ### GitLab account (username and password, Microsoft…)
 
 This uses GitLab's OAuth 2 with PKCE. The app sends you to your GitLab sign-in page, where you sign in with your username and password or with Microsoft or another provider your GitLab offers. **The app never sees your password.** The token renews itself when it expires.
@@ -168,7 +232,7 @@ You register the app once:
 3. **Redirect URI:** `http://localhost:4000/api/auth/oauth/callback`. If you use another port, change it to match.
 4. **Confidential:** unchecked. PKCE is used, so no secret is needed.
 5. **Scopes:** `api`, `read_user`, `read_repository`, `write_repository`
-6. Save, then paste the **Application ID** on the login screen.
+6. Save, then paste the **Application ID** on the login screen. It's remembered for that server, so you only do this once.
 
 If your user can't create applications, a GitLab administrator can create one for the whole instance (*Admin → Applications*) with the same values.
 
@@ -211,6 +275,7 @@ In **Cuentas** you can add more GitLab instances and GitHub accounts, each with 
 |---|---|---|
 | `PORT` | `4000` | Server port. The OAuth redirect URI changes with it (`http://localhost:<PORT>/api/auth/oauth/callback`). |
 | `GIT_MANAGER_HOME` | `~/.git-manager` | Folder for the configuration, operation log and server log |
+| `GIT_MANAGER_GITLAB_CLIENT_ID` / `GIT_MANAGER_GITHUB_CLIENT_ID` | from `oauth-apps.json` | Built-in OAuth app IDs for gitlab.com and github.com |
 | `CLIENT_URL` | `http://localhost:5173` in development, `http://localhost:<PORT>` in production | Where the GitLab OAuth callback sends you back |
 
 For example, with PowerShell:
@@ -225,7 +290,7 @@ All of these live in `GIT_MANAGER_HOME` (`C:\Users\<you>\.git-manager` on Window
 
 | File | Contents |
 |---|---|
-| `config.json` | Sessions and tokens, your repository list with favorites and labels, extra accounts, OAuth app IDs, and auto-fetch settings |
+| `config.json` | Sessions and tokens, your repository list with favorites and labels, groups and work environments, extra accounts, OAuth app IDs, and auto-fetch settings |
 | `oplog.json` | The operation log (most recent entries) |
 | `server.log` | Server output when started by the Windows task. It rotates at 1 MB to `server.old.log`. |
 
@@ -243,7 +308,7 @@ Shortcuts without `Ctrl` or `Alt` only work when you're not typing in a field. `
 |---|---|---|
 | Anywhere | `Ctrl+K` | Search repositories |
 | Anywhere | `Ctrl+Shift+P`, `F1`, `?` | Command palette |
-| Anywhere | `Alt+1` … `Alt+6` | Go to a section |
+| Anywhere | `Alt+1` … `Alt+7` | Go to a section |
 | Anywhere | `Alt+T` / `Alt+M` | Toggle the theme / the sidebar |
 | Repository list | `/` | Search in the list |
 | Repository list | `a` / `n` / `r` | Add repositories / clone / refresh |
@@ -266,6 +331,7 @@ Shortcuts without `Ctrl` or `Alt` only work when you're not typing in a field. `
 ```
 git-manager/
 ├── package.json             # workspaces and top-level scripts
+├── oauth-apps.json          # built-in public OAuth app IDs (gitlab.com, github.com)
 ├── scripts/startup/         # Windows sign-in task (startup.ps1, launch.mjs)
 ├── server/                  # Node + Express API
 │   └── src/
@@ -281,12 +347,12 @@ git-manager/
 │       ├── commitmsg.js     # commit message suggestions
 │       ├── scan.js          # finds repositories inside a folder
 │       ├── open.js          # opens folder, VS Code or terminal
-│       └── routes/          # auth, repos, gitlab, github, accounts, fs, auto-fetch, oplog
+│       └── routes/          # auth, repos, workspaces, gitlab, github, accounts, fs, auto-fetch, oplog
 └── client/                  # React + Vite + Material UI
     └── src/
         ├── App.jsx          # layout, navigation, routes
         ├── theme.js         # light and dark themes
-        ├── pages/           # Login, Repos, RepoDetail, History, Branches, Compare, FileHistory,
+        ├── pages/           # Login, Repos, Workspaces, RepoDetail, History, Branches, Compare, FileHistory,
         │                    # Stashes, Tags, Projects, MergeRequests, PullRequests, OpLog, Accounts
         └── components/      # DiffView, ConflictResolver, CommitBox, dialogs, command palette…
 ```
