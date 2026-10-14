@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { load, update } from './config.js';
 import { accountForHost, publicAccount, verifyToken } from './accounts.js';
+import { builtinClientId } from './builtinApps.js';
 
 export const GITHUB_SCOPES = 'repo read:user read:org';
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
@@ -39,14 +40,17 @@ async function postForm(url, form) {
 
 export async function startDevice(url, clientId) {
   const base = cleanUrl(url);
-  if (!clientId?.trim()) throw bad('Falta el Client ID de la OAuth App');
+  const own = clientId?.trim();
+  clientId = own || builtinClientId('github', base);
+  if (!clientId) throw bad('Falta el Client ID de la OAuth App');
   const d = await postForm(`${base}/login/device/code`, { client_id: clientId.trim(), scope: GITHUB_SCOPES });
   if (d.error) {
     throw bad(d.error === 'device_flow_disabled'
       ? 'La OAuth App no tiene activado "Enable Device Flow". Actívalo en su configuración.'
-      : d.error === 'unauthorized_client' || d.error === 'incorrect_client_credentials' ? 'Client ID no válido' : (d.error_description || d.error));
+      : ['unauthorized_client', 'incorrect_client_credentials', 'Not Found'].includes(d.error) ? 'Client ID no válido' : (d.error_description || d.error));
   }
-  update((c) => { c.github = { ...(c.github || {}), oauthClientId: clientId.trim(), url: base }; });
+  // Solo se recuerda un Client ID propio; el incluido se lee siempre de oauth-apps.json.
+  update((c) => { c.github = { ...(c.github || {}), ...(own ? { oauthClientId: own } : {}), url: base }; });
   const id = crypto.randomUUID();
   pending.set(id, { base, clientId: clientId.trim(), deviceCode: d.device_code, expiresAt: Date.now() + d.expires_in * 1000 });
   return { id, userCode: d.user_code, verificationUri: d.verification_uri, interval: d.interval || 5, expiresIn: d.expires_in };

@@ -1,9 +1,26 @@
 import { Router } from 'express';
-import { load } from '../config.js';
+import { load, update } from '../config.js';
 import * as gl from '../gitlab.js';
+import { builtinApps, builtinClientId } from '../builtinApps.js';
 import { GITHUB_SCOPES, githubLogin, logoutGithub, pollDevice, saveGithubLogin, startDevice } from '../githubAuth.js';
 
 const r = Router();
+const hostOf = (url) => { try { return new URL(url).host.toLowerCase(); } catch { return ''; } };
+
+function gitlabClientIds(c) {
+  const ids = { ...(c.gitlab.clientIds || {}) };
+  // Compatibilidad: el Application ID usado antes de guardarlos por servidor.
+  const h = hostOf(c.gitlab.url);
+  if (h && c.gitlab.oauthClientId && !ids[h] && c.gitlab.oauthClientId !== builtinClientId('gitlab', c.gitlab.url)) ids[h] = c.gitlab.oauthClientId;
+  return ids;
+}
+
+// Tras iniciar sesión con éxito se guarda el Application ID propio de ese servidor (el incluido no hace falta).
+function rememberGitlabClientId() {
+  const g = load().gitlab;
+  if (!g.oauthClientId || g.oauthClientId === builtinClientId('gitlab', g.url)) return;
+  update((c) => { c.gitlab.clientIds = { ...(c.gitlab.clientIds || {}), [hostOf(g.url)]: g.oauthClientId }; });
+}
 const CLIENT_URL = process.env.CLIENT_URL || (process.argv.includes('--prod') ? `http://localhost:${gl.PORT}` : 'http://localhost:5173');
 
 r.get('/status', (req, res) => {
@@ -15,10 +32,14 @@ r.get('/status', (req, res) => {
     githubClientId: c.github?.oauthClientId || '',
     githubUrl: c.github?.url || 'https://github.com',
     githubScopes: GITHUB_SCOPES,
+    // Aplicaciones OAuth incluidas (IDs públicos): con ellas no hace falta registrar una propia.
+    builtin: builtinApps(),
     url: g.url,
     authType: g.authType,
     user: g.user,
     oauthClientId: g.oauthClientId,
+    // Application ID propio de cada servidor de GitLab con el que ya se inició sesión (host -> id).
+    gitlabClientIds: gitlabClientIds(c),
     oauthRedirect: gl.OAUTH_REDIRECT,
     oauthScopes: gl.OAUTH_SCOPES,
   });
@@ -31,9 +52,10 @@ r.post('/pat', async (req, res) => {
 });
 
 r.post('/oauth/start', (req, res) => {
-  const { url, clientId } = req.body || {};
+  const { url } = req.body || {};
+  const clientId = req.body?.clientId?.trim() || builtinClientId('gitlab', url);
   if (!url || !clientId) return res.status(400).json({ error: 'Faltan la URL o el Application ID' });
-  res.json({ authorizeUrl: gl.startOAuth(url, clientId.trim()) });
+  res.json({ authorizeUrl: gl.startOAuth(url, clientId) });
 });
 
 // GitLab redirige aquí tras el inicio de sesión (con Microsoft u otro proveedor).
@@ -42,6 +64,7 @@ r.get('/oauth/callback', async (req, res) => {
   if (error) return res.redirect(`${CLIENT_URL}/login?error=${encodeURIComponent(error_description || error)}`); // también sirve si ya hay sesión de GitHub: /login muestra la conexión de GitLab
   try {
     await gl.finishOAuth(code, state);
+    rememberGitlabClientId();
     res.redirect(`${CLIENT_URL}/`);
   } catch (e) {
     res.redirect(`${CLIENT_URL}/login?error=${encodeURIComponent(e.message)}`);

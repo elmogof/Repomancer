@@ -9,7 +9,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const defaults = {
   gitlab: {
-    url: 'https://gitlab.sysco.cr',
+    url: 'https://gitlab.com',
     authType: null, // 'pat' | 'oauth'
     token: null,
     refreshToken: null,

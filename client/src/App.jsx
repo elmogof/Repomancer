@@ -82,6 +82,8 @@ export default function App({ mode, onToggleMode }) {
 
   const refresh = useCallback(() => api.get('/auth/status').then(setAuth).catch(() => setAuth({})), []);
   useEffect(() => { refresh(); }, [refresh]);
+  // Al volver a la pestaña se relee la sesión (p. ej. tras cambiar la configuración o iniciar sesión en otra pestaña).
+  useEffect(() => { window.addEventListener('focus', refresh); return () => window.removeEventListener('focus', refresh); }, [refresh]);
   useEffect(() => { setMobileOpen(false); }, [loc.pathname]);
 
   if (!auth) return <Box sx={{ display: 'grid', placeItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
