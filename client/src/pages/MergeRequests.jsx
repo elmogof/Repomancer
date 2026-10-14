@@ -8,6 +8,10 @@ import { api, qs } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import InstanceSelect from '../components/InstanceSelect.jsx';
 import { useGitlabInstance } from '../gitlabInstance.js';
+import ListSkeleton from '../components/ListSkeleton.jsx';
+
+// Última respuesta de cada consulta: al volver a la pantalla se muestra al instante mientras se actualiza.
+const cache = new Map();
 
 const STATE_COLOR = { opened: 'success', merged: 'info', closed: 'default' };
 const STATE_LABEL = { opened: 'Abierto', merged: 'Fusionado', closed: 'Cerrado' };
@@ -17,16 +21,25 @@ export default function MergeRequests() {
   const project = params.get('project');
   const [state, setState] = useState('opened');
   const [scope, setScope] = useState('all');
-  const [items, setItems] = useState(null);
   const notify = useNotify();
   const navigate = useNavigate();
   const instance = useGitlabInstance();
+  const url = project ? `/gitlab/projects/${project}/merge_requests${qs({ state })}` : `/gitlab/merge_requests${qs({ state, scope })}`;
+  const key = `${instance || ''} ${url}`;
+  const [items, setItems] = useState(() => cache.get(key) || null);
+  const [loading, setLoading] = useState(true);
 
+  // Al cambiar de filtro se mantiene la lista anterior (con la barra de carga) hasta que llega la nueva.
   useEffect(() => {
-    setItems(null);
-    const url = project ? `/gitlab/projects/${project}/merge_requests${qs({ state })}` : `/gitlab/merge_requests${qs({ state, scope })}`;
-    api.get(url).then(setItems).catch((e) => { notify(e.message, 'error'); setItems([]); });
-  }, [project, state, scope, instance]);
+    let alive = true;
+    setLoading(true);
+    if (cache.has(key)) setItems(cache.get(key));
+    api.get(url)
+      .then((d) => { cache.set(key, d); if (alive) setItems(d); })
+      .catch((e) => { if (alive) { notify(e.message, 'error'); setItems((cur) => cur || []); } })
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [key]);
 
   return (
     <Box>
@@ -48,10 +61,13 @@ export default function MergeRequests() {
           <ToggleButton value="all">Todos</ToggleButton>
         </ToggleButtonGroup>
       </Stack>
-      {!items ? <LinearProgress /> : (
-        <Paper variant="outlined">
+      <Box sx={{ height: 4, mb: 1 }}>{loading && <LinearProgress />}</Box>
+      {!items ? (
+        <Paper variant="outlined"><List disablePadding><ListSkeleton /></List></Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }}>
           <List disablePadding>
-            {items.length === 0 && <Typography color="text.secondary" sx={{ p: 2 }}>No hay merge requests.</Typography>}
+            {items.length === 0 && !loading && <Typography color="text.secondary" sx={{ p: 2 }}>No hay merge requests.</Typography>}
             {items.map((mr) => (
               <ListItemButton key={mr.id} divider onClick={() => navigate(`/projects/${mr.project_id}/merge-requests/${mr.iid}`)}>
                 <ListItemAvatar><Avatar src={mr.author?.avatar_url} /></ListItemAvatar>

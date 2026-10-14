@@ -6,6 +6,9 @@ import {
 } from '@mui/material';
 import OpenIcon from '@mui/icons-material/OpenInNew';
 import { api, qs } from '../api/client.js';
+import ListSkeleton from '../components/ListSkeleton.jsx';
+
+const cache = new Map();
 
 const fmt = (d) => new Date(d).toLocaleDateString('es-CR', { dateStyle: 'medium' });
 const host = (url) => { try { return new URL(url).host; } catch { return url; } };
@@ -14,13 +17,22 @@ const host = (url) => { try { return new URL(url).host; } catch { return url; } 
 export default function PullRequests() {
   const [filter, setFilter] = useState('involves');
   const [state, setState] = useState('open');
-  const [data, setData] = useState(null);
+  const url = `/github/pulls${qs({ filter, state })}`;
+  const [data, setData] = useState(() => cache.get(url) || null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Se mantiene la lista anterior hasta que llega la nueva; la última respuesta de cada filtro se recuerda.
   useEffect(() => {
-    setData(null);
-    api.get(`/github/pulls${qs({ filter, state })}`).then(setData).catch((e) => setData([{ error: e.message, items: [] }]));
-  }, [filter, state]);
+    let alive = true;
+    setLoading(true);
+    if (cache.has(url)) setData(cache.get(url));
+    api.get(url)
+      .then((d) => { cache.set(url, d); if (alive) setData(d); })
+      .catch((e) => alive && setData([{ error: e.message, items: [] }]))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [url]);
 
   return (
     <Box>
@@ -36,7 +48,10 @@ export default function PullRequests() {
           <ToggleButton value="closed">Cerrados</ToggleButton>
         </ToggleButtonGroup>
       </Stack>
-      {!data ? <LinearProgress /> : !data.length ? (
+      <Box sx={{ height: 4, mb: 1 }}>{loading && <LinearProgress />}</Box>
+      {!data ? (
+        <Paper variant="outlined"><List disablePadding><ListSkeleton avatar={false} /></List></Paper>
+      ) : !data.length ? (
         <Alert severity="info" action={<Button color="inherit" onClick={() => navigate('/accounts')}>Ir a Cuentas</Button>}>
           Añade una cuenta de GitHub (con su token personal) para ver y crear pull requests desde aquí.
         </Alert>
@@ -44,9 +59,9 @@ export default function PullRequests() {
         <Box key={group.account?.id || i} sx={{ mb: 3 }}>
           {group.account && <Typography variant="subtitle2" sx={{ mb: 1 }}>{host(group.account.url)} · @{group.account.user?.username}</Typography>}
           {group.error && <Alert severity="error" sx={{ mb: 1 }}>{group.error}</Alert>}
-          {!group.error && !group.items.length && <Typography color="text.secondary">No hay pull requests con este filtro.</Typography>}
+          {!group.error && !group.items.length && !loading && <Typography color="text.secondary">No hay pull requests con este filtro.</Typography>}
           {group.items.length > 0 && (
-            <Paper variant="outlined">
+            <Paper variant="outlined" sx={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }}>
               <List disablePadding>
                 {group.items.map((p) => (
                   <ListItemButton key={p.html_url} divider component="a" href={p.html_url} target="_blank" rel="noopener">

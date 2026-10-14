@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Avatar, Box, Button, Checkbox, Chip, CircularProgress,
+  Accordion, AccordionDetails, AccordionSummary, Avatar, Box, Button, Checkbox, Chip, CircularProgress, Skeleton,
   FormControlLabel, IconButton, Link, Paper, Stack, Tab, Tabs, TextField, Typography,
 } from '@mui/material';
 import ExpandIcon from '@mui/icons-material/ExpandMore';
@@ -11,11 +11,15 @@ import { api } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import DiffView from '../components/DiffView.jsx';
 
+// Último detalle cargado de cada MR: al volver se muestra al instante mientras se actualiza.
+const mrCache = new Map();
+
 export default function MergeRequestDetail() {
   const { pid, iid } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const [mr, setMr] = useState(null);
+  const [mr, setMrState] = useState(() => mrCache.get(`${pid}/${iid}`) || null);
+  const setMr = (m) => { mrCache.set(`${pid}/${iid}`, m); setMrState(m); };
   const [tab, setTab] = useState(0);
   const [comment, setComment] = useState('');
   const [squash, setSquash] = useState(false);
@@ -31,7 +35,18 @@ export default function MergeRequestDetail() {
     try { await fn(); notify(ok); await load(); } catch (e) { notify(e.message, 'error'); } finally { setBusy(false); }
   };
 
-  if (!mr) return <CircularProgress />;
+  if (!mr) return (
+    <Box>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
+        <Skeleton variant="circular" width={32} height={32} /><Skeleton width="45%" height={36} />
+        <Box sx={{ flexGrow: 1 }} /><Skeleton variant="rounded" width={150} height={34} />
+      </Stack>
+      <Stack direction="row" spacing={1} sx={{ mb: 2, ml: 6 }}><Skeleton variant="rounded" width={70} height={24} /><Skeleton width={320} /></Stack>
+      <Skeleton variant="rounded" height={64} sx={{ mb: 2 }} />
+      <Skeleton variant="rounded" height={44} sx={{ mb: 2 }} />
+      <Skeleton variant="rounded" height={240} />
+    </Box>
+  );
   const adds = (d) => (d.match(/^\+(?!\+\+)/gm) || []).length;
   const dels = (d) => (d.match(/^-(?!--)/gm) || []).length;
 
