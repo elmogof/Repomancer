@@ -37,6 +37,7 @@ import Stashes from './Stashes.jsx';
 import Compare from './Compare.jsx';
 import FileHistory from './FileHistory.jsx';
 import Tags from './Tags.jsx';
+import RepoQuickActions from '../components/RepoQuickActions.jsx';
 
 const STATUS_LABEL = { M: 'Modificado', A: 'Añadido', D: 'Eliminado', R: 'Renombrado', C: 'Copiado', U: 'Conflicto', '?': 'Nuevo', T: 'Tipo' };
 const STATUS_COLOR = { M: 'warning', A: 'success', D: 'error', R: 'info', U: 'error', '?': 'success' };
@@ -312,7 +313,10 @@ export default function RepoDetail() {
             </Tooltip>
           )}
         </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 1, ml: { xs: 0, sm: 6 }, fontSize: { xs: 11.5, sm: 14 }, wordBreak: 'break-all' }}>{st.path}</Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1} sx={{ mb: 1, ml: { xs: 0, sm: 6 } }}>
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: { xs: 11.5, sm: 14 }, wordBreak: 'break-all', flexGrow: 1, minWidth: 0 }}>{st.path}</Typography>
+          <RepoQuickActions repo={st} onChanged={load} onRemoved={() => navigate('/repos')} />
+        </Stack>
         {(st.operation || conflicts.length > 0) && (
           <Alert severity={conflicts.length ? 'error' : 'warning'} sx={{ mb: 1 }} action={
             <Stack direction="row" spacing={1}>
