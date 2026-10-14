@@ -71,11 +71,32 @@ async function pool(items, fn) {
 const firstLine = (e) => String(e?.message || e).split('\n').find((l) => l.trim())?.replace(/^(error|fatal):\s*/i, '') || 'Error';
 
 // ---------- lista y edición ----------
+// Estado de un repositorio de un grupo: cambios sin commit, commits por subir o bajar, y las ramas que existen
+// (locales y de origin, sin el prefijo) para avisar de entornos que apuntan a ramas borradas.
+async function repoState(repo) {
+  if (!fs.existsSync(repo.path)) return { missing: true };
+  try {
+    const [s, { stdout }] = await Promise.all([
+      git.status(repo.path),
+      git.run(repo.path, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes/origin']),
+    ]);
+    const branches = [...new Set(stdout.split('\n').filter(Boolean).map((ref) => ref.replace(/^refs\/(heads|remotes\/origin)\//, '')).filter((b) => b !== 'HEAD'))];
+    return { changes: s.files.length, ahead: s.ahead, behind: s.behind, upstream: s.upstream, branches };
+  } catch (e) { return { error: firstLine(e) }; }
+}
+
+// status=0 devuelve solo las ramas actuales (rápido); por defecto incluye el estado de los repos que están en algún grupo.
 r.get('/', async (req, res) => {
   const repos = load().repos;
   const current = {};
   await Promise.all(repos.map(async (x) => { current[x.id] = fs.existsSync(x.path) ? await currentBranch(x.path) : null; }));
-  res.json({ groups: groups(), current, repos: repos.map((x) => ({ id: x.id, name: x.name, missing: !fs.existsSync(x.path) })) });
+  const out = { groups: groups(), current, repos: repos.map((x) => ({ id: x.id, name: x.name, missing: !fs.existsSync(x.path) })) };
+  if (req.query.status !== '0') {
+    const ids = [...new Set(out.groups.flatMap((g) => g.repos))];
+    const states = await pool(ids, (id) => repoState(repos.find((x) => x.id === id)));
+    out.state = Object.fromEntries(ids.map((id, i) => [id, states[i]]));
+  }
+  res.json(out);
 });
 
 r.post('/', (req, res) => {
@@ -243,6 +264,57 @@ r.post('/:id/switch', async (req, res) => {
   }
   saveGroup(sanitize(fresh));
   res.json({ results, group: getGroup(g.id) });
+});
+
+// ---------- acciones en lote sobre el grupo ----------
+// fetch: todos; pull: solo avance rápido (nunca crea un merge); push: solo ramas con upstream y commits por subir.
+const OPS = {
+  fetch: { label: 'Fetch', run: async (repo) => { await git.runRemote(repo.path, ['fetch', '--prune']); markFetched(repo.id); return { status: 'ok', steps: ['Fetch completado'] }; } },
+  pull: {
+    label: 'Pull',
+    run: async (repo) => {
+      const s = await git.status(repo.path);
+      if (!s.upstream) return { status: 'skipped', error: 'La rama no tiene upstream' };
+      try {
+        const { stdout, stderr } = await git.runRemote(repo.path, ['pull', '--ff-only']);
+        return /Already up to date|Ya está actualizado/i.test(stdout + stderr) ? { status: 'unchanged', steps: ['Ya estaba al día'] } : { status: 'ok', steps: ['Actualizado'] };
+      } catch (e) {
+        if (/not possible to fast-forward|diverg/i.test(e.message)) return { status: 'warning', warnings: ['La rama local y la remota divergen: haz pull desde el repositorio para elegir merge o rebase'] };
+        throw e;
+      }
+    },
+  },
+  push: {
+    label: 'Push',
+    run: async (repo) => {
+      const s = await git.status(repo.path);
+      if (!s.upstream) return { status: 'skipped', error: 'La rama no está publicada (publícala desde el repositorio)' };
+      if (!s.ahead) return { status: 'unchanged', steps: ['No hay commits por subir'] };
+      await git.runRemote(repo.path, ['push']);
+      return { status: 'ok', steps: [`${s.ahead} commit(s) subidos`] };
+    },
+  },
+};
+
+r.post('/:id/run', async (req, res) => {
+  const g = getGroup(req.params.id);
+  const op = OPS[req.body?.op];
+  if (!op) throw bad('Operación inválida');
+  const started = Date.now();
+  const repos = g.repos.map((id) => load().repos.find((x) => x.id === id));
+  const results = await pool(repos, async (x) => {
+    const base = { repoId: x.id, name: x.name, steps: [] };
+    if (!fs.existsSync(x.path)) return { ...base, status: 'failed', error: 'La carpeta ya no existe' };
+    try { return { ...base, ...(await op.run(x)) }; } catch (e) { return { ...base, status: 'failed', error: firstLine(e), details: e.message }; }
+  });
+  for (const x of results) {
+    if (x.status === 'unchanged' && req.body.op !== 'fetch') continue;
+    record({
+      action: req.body.op, label: `${op.label} · grupo ${g.name}`, repoId: x.repoId, ok: x.status !== 'failed', ms: Date.now() - started,
+      summary: x.error || x.warnings?.[0] || x.steps.at(-1) || 'Completado', details: x.details || null,
+    });
+  }
+  res.json({ results });
 });
 
 export default r;

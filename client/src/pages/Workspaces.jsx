@@ -22,19 +22,21 @@ import SkipIcon from '@mui/icons-material/RemoveCircleOutline';
 import CloudIcon from '@mui/icons-material/CloudOutlined';
 import BranchIcon from '@mui/icons-material/CallSplit';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
+import FetchIcon from '@mui/icons-material/Sync';
+import PullIcon from '@mui/icons-material/Download';
+import PushIcon from '@mui/icons-material/Upload';
 import { api } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import { useCommands } from '../components/Commands.jsx';
+import { getSwitchPrefs as prefs, setSwitchPrefs as savePrefs } from '../workspacePrefs.js';
 
 // Última lista cargada: al volver a la página se muestra al instante mientras se actualiza.
 let lastData = null;
 
-const prefs = () => { try { return { fetch: true, pull: true, dirty: 'stash', ...JSON.parse(localStorage.getItem('gm-ws-switch') || '{}') }; } catch { return { fetch: true, pull: true, dirty: 'stash' }; } };
 // Grupos contraídos (se recuerdan en este navegador).
 const COLLAPSED_KEY = 'gm-ws-collapsed';
 const storedCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]')); } catch { return new Set(); } };
 const saveCollapsed = (set) => { try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch { /* sin almacenamiento */ } };
-const savePrefs = (p) => { try { localStorage.setItem('gm-ws-switch', JSON.stringify(p)); } catch { /* sin almacenamiento */ } };
 
 // Estado de cada entorno respecto a las ramas actuales: activo (todo coincide) o con N repos distintos.
 function envState(env, current) {
@@ -194,6 +196,70 @@ const RESULTS = {
   kept: { icon: <SkipIcon color="disabled" fontSize="small" />, label: 'No cambia' },
 };
 
+// Resultado por repositorio de un cambio de entorno o de una acción en lote.
+function ResultsList({ results }) {
+  return (
+    <Stack divider={<Divider />} sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
+      {results.map((x) => {
+        const rs = RESULTS[x.status] || RESULTS.failed;
+        return (
+          <Stack key={x.repoId} direction="row" spacing={1.5} sx={{ p: 1.5, opacity: x.status === 'kept' ? 0.6 : 1 }}>
+            <Box sx={{ pt: 0.25 }}>{rs.icon}</Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="body2" fontWeight={600}>{x.name}</Typography>
+                {x.target && <><BranchIcon sx={{ fontSize: 16, color: 'text.secondary' }} /><BranchText name={x.target} /></>}
+                <Typography variant="caption" color="text.secondary">· {rs.label}</Typography>
+              </Stack>
+              {(x.steps || []).map((t) => <Typography key={t} variant="caption" color="text.secondary" component="div">{t}</Typography>)}
+              {(x.warnings || []).map((t) => <Typography key={t} variant="caption" color="warning.main" component="div">{t}</Typography>)}
+              {x.error && <Typography variant="caption" color="error" component="div">{x.error}</Typography>}
+            </Box>
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+}
+
+// ---------- fetch / pull / push de todo el grupo ----------
+const OPS = {
+  fetch: { label: 'Fetch', Icon: FetchIcon, title: 'Buscar novedades en origin en todos los repositorios' },
+  pull: { label: 'Pull', Icon: PullIcon, title: 'Actualizar todos los repositorios (solo avance rápido: nunca crea un merge)' },
+  push: { label: 'Push', Icon: PushIcon, title: 'Subir los commits pendientes de todos los repositorios (solo ramas ya publicadas)' },
+};
+
+function RunDialog({ target, onClose, onDone }) {
+  const { group, op } = target || {};
+  const [results, setResults] = useState(null);
+  const notify = useNotify();
+  useEffect(() => {
+    if (!target) return;
+    setResults(null);
+    api.post(`/workspaces/${group.id}/run`, { op }).then((d) => {
+      setResults(d.results);
+      const failed = d.results.filter((x) => x.status === 'failed').length;
+      notify(failed ? `${OPS[op].label} en ${group.name}: ${failed} con errores` : `${OPS[op].label} completado en ${group.name}`, failed ? 'error' : 'success');
+      onDone();
+    }).catch((e) => { notify(e.message, 'error'); onClose(); });
+  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
+  const Icon = op && OPS[op].Icon;
+  return (
+    <Dialog open={!!target} onClose={results ? onClose : undefined} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{Icon && <Icon color="primary" />}{op && `${OPS[op].label} · ${group.name}`}</DialogTitle>
+      <DialogContent>
+        {!results ? (
+          <Stack alignItems="center" spacing={1.5} sx={{ py: 3 }}>
+            <CircularProgress size={28} />
+            <Typography variant="body2" color="text.secondary">{op && OPS[op].label} en {group?.repos.length} repositorios…</Typography>
+          </Stack>
+        ) : <ResultsList results={results} />}
+      </DialogContent>
+      <DialogActions><Button variant="contained" disabled={!results} onClick={onClose}>Cerrar</Button></DialogActions>
+    </Dialog>
+  );
+}
+
 function SwitchDialog({ target, onClose, onDone }) {
   const { group, env, restore } = target || {};
   const [opts, setOpts] = useState(prefs);
@@ -311,26 +377,7 @@ function SwitchDialog({ target, onClose, onDone }) {
             )}
           </>
         ) : (
-          <Stack divider={<Divider />} sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
-            {results.map((x) => {
-              const rs = RESULTS[x.status] || RESULTS.failed;
-              return (
-                <Stack key={x.repoId} direction="row" spacing={1.5} sx={{ p: 1.5, opacity: x.status === 'kept' ? 0.6 : 1 }}>
-                  <Box sx={{ pt: 0.25 }}>{rs.icon}</Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                      <Typography variant="body2" fontWeight={600}>{x.name}</Typography>
-                      {x.target && <><BranchIcon sx={{ fontSize: 16, color: 'text.secondary' }} /><BranchText name={x.target} /></>}
-                      <Typography variant="caption" color="text.secondary">· {rs.label}</Typography>
-                    </Stack>
-                    {[...(x.steps || [])].map((s) => <Typography key={s} variant="caption" color="text.secondary" component="div">{s}</Typography>)}
-                    {(x.warnings || []).map((s) => <Typography key={s} variant="caption" color="warning.main" component="div">{s}</Typography>)}
-                    {x.error && <Typography variant="caption" color="error" component="div">{x.error}</Typography>}
-                  </Box>
-                </Stack>
-              );
-            })}
-          </Stack>
+          <ResultsList results={results} />
         )}
       </DialogContent>
       <DialogActions>
@@ -349,7 +396,7 @@ function SwitchDialog({ target, onClose, onDone }) {
 }
 
 // ---------- tarjeta de un grupo ----------
-function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore }) {
+function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore }) {
   const [newMenu, setNewMenu] = useState(null);
   const states = group.envs.map((e) => envState(e, current));
   // Si varios entornos coinciden con las ramas actuales, se marca el último usado.
@@ -368,6 +415,19 @@ function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEdi
   // Al cambiar de entorno la tabla vuelve a mostrar el activo.
   useEffect(() => { setViewId(null); }, [group.lastEnv]);
 
+  // Estado del grupo de un vistazo (cambios sin commit, commits por subir o bajar) y ramas de entornos que ya no existen.
+  const st = (id) => state[id] || {};
+  const count = (fn) => group.repos.filter((id) => fn(st(id))).length;
+  const summary = [
+    { key: 'changes', n: count((x) => x.changes > 0), text: 'con cambios', color: 'warning' },
+    { key: 'ahead', n: count((x) => x.ahead > 0), text: 'por subir', color: 'info' },
+    { key: 'behind', n: count((x) => x.behind > 0), text: 'por bajar', color: 'info' },
+    { key: 'error', n: count((x) => x.missing || x.error), text: 'con error', color: 'error' },
+  ].filter((x) => x.n);
+  const known = group.repos.some((id) => state[id]);
+  const gone = (env, id) => { const b = env.branches[id]; const list = st(id).branches; return !!(b && list && !list.includes(b)); };
+  const missingIn = (env) => group.repos.filter((id) => gone(env, id));
+
   return (
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
@@ -377,7 +437,13 @@ function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEdi
           </IconButton>
         </Tooltip>
         <Box sx={{ minWidth: 0, flexGrow: 1, cursor: 'pointer' }} onClick={onToggle}>
-          <Typography variant="h6" noWrap>{group.name}</Typography>
+          {/* Nombre del grupo y, a su derecha, el estado de un vistazo. */}
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
+            <Typography variant="h6" noWrap sx={{ minWidth: 0 }}>{group.name}</Typography>
+            {known && (summary.length
+              ? summary.map((x) => <Chip key={x.key} size="small" variant="outlined" color={x.color} label={`${x.n} ${x.text}`} sx={{ height: 20, fontSize: 11.5 }} />)
+              : <Chip size="small" variant="outlined" color="success" icon={<CheckIcon />} label="Todo al día" sx={{ height: 20, fontSize: 11.5 }} />)}
+          </Stack>
           <Typography variant="caption" color="text.secondary">
             {group.repos.length} {group.repos.length === 1 ? 'repositorio' : 'repositorios'}
             {activeIdx >= 0 && <> · Entorno activo: <b>{group.envs[activeIdx].name}</b></>}
@@ -389,15 +455,22 @@ function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEdi
             <Button size="small" startIcon={<UndoIcon />} onClick={onRestore}>Volver al estado anterior</Button>
           </Tooltip>
         )}
+        {Object.entries(OPS).map(([op, o]) => (
+          <Tooltip key={op} title={o.title}><IconButton size="small" onClick={() => onRun(op)} aria-label={`${o.label} del grupo`}><o.Icon fontSize="small" /></IconButton></Tooltip>
+        ))}
         <Tooltip title="Editar grupo"><IconButton size="small" onClick={onEditGroup}><EditIcon fontSize="small" /></IconButton></Tooltip>
       </Stack>
 
       <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: open ? 1.5 : 0, transition: 'margin .2s' }}>
         {group.envs.map((e, i) => {
           const on = i === activeIdx;
+          const lost = missingIn(e);
+          const tip = lost.length
+            ? <>Ramas que ya no existen (ni en local ni en origin):{lost.map((id) => <div key={id}>· {repoName(id)}: {e.branches[id]}</div>)}</>
+            : on ? 'Entorno activo' : `Cambiar a ${e.name}`;
           return (
-            <Tooltip key={e.id} title={on ? 'Entorno activo' : `Cambiar a ${e.name}`}>
-              <Chip clickable color={on ? 'primary' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : undefined}
+            <Tooltip key={e.id} title={tip}>
+              <Chip clickable color={on ? 'primary' : lost.length ? 'warning' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : lost.length ? <WarningIcon /> : undefined}
                 label={e.name} onClick={() => onSwitch(e)} onDelete={() => onEditEnv(e)} deleteIcon={<EditIcon titleAccess="Editar entorno" />}
                 sx={{ fontWeight: 600, ...(partial?.env.id === e.id && { borderStyle: 'dashed', borderColor: 'primary.main' }) }} />
             </Tooltip>
@@ -438,18 +511,27 @@ function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEdi
             {group.repos.map((id) => {
               const b = viewed?.branches[id];
               const off = b && current[id] !== b;
+              const lost = viewed && gone(viewed, id);
               return (
                 // Un clic en la fila abre el detalle del repositorio.
                 <TableRow key={id} hover onClick={() => onOpenRepo(id)}
                   sx={{ cursor: 'pointer', '&:hover .repo-name': { color: 'primary.main', textDecoration: 'underline' } }}>
                   <TableCell className="repo-name" sx={{ fontWeight: 600 }} title={`Abrir ${repoName(id)}`}>{repoName(id)}</TableCell>
-                  <TableCell title={current[id] || ''}><BranchText name={current[id]} /></TableCell>
+                  <TableCell title={current[id] || ''}>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                      <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}><BranchText name={current[id]} /></Box>
+                      {st(id).changes > 0 && <Box component="span" title={`${st(id).changes} cambio(s) sin commit`} sx={{ color: 'warning.main', fontSize: 12, flexShrink: 0 }}>●{st(id).changes}</Box>}
+                      {st(id).ahead > 0 && <Box component="span" title={`${st(id).ahead} commit(s) por subir`} sx={{ color: 'info.main', fontSize: 12, flexShrink: 0 }}>↑{st(id).ahead}</Box>}
+                      {st(id).behind > 0 && <Box component="span" title={`${st(id).behind} commit(s) por bajar`} sx={{ color: 'info.main', fontSize: 12, flexShrink: 0 }}>↓{st(id).behind}</Box>}
+                    </Stack>
+                  </TableCell>
                   <TableCell sx={(t) => ({ bgcolor: alpha(t.palette.primary.main, 0.06) })}
-                    title={!b ? 'Este entorno no cambia este repositorio' : off ? `Está en ${current[id] || '?'}; este entorno usa ${b}` : b}>
+                    title={!b ? 'Este entorno no cambia este repositorio' : lost ? `La rama ${b} ya no existe en local ni en origin` : off ? `Está en ${current[id] || '?'}; este entorno usa ${b}` : b}>
                     {!b ? <Typography component="span" variant="body2" color="text.disabled">— no cambia</Typography> : (
                       <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-                        {off && <WarningIcon color="warning" sx={{ fontSize: 16, flexShrink: 0 }} />}
-                        <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 12.5, color: off ? 'warning.main' : 'text.primary' }}>{b}</Box>
+                        {(off || lost) && <WarningIcon color={lost ? 'error' : 'warning'} sx={{ fontSize: 16, flexShrink: 0 }} />}
+                        <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 12.5, color: lost ? 'error.main' : off ? 'warning.main' : 'text.primary', textDecoration: lost ? 'line-through' : 'none' }}>{b}</Box>
+                        {lost && <Typography component="span" variant="caption" color="error" sx={{ flexShrink: 0 }}>no existe</Typography>}
                       </Stack>
                     )}
                   </TableCell>
@@ -471,6 +553,7 @@ export default function Workspaces() {
   const [groupDlg, setGroupDlg] = useState(null); // { group? , repos? }
   const [envDlg, setEnvDlg] = useState(null); // { group, env?, seed? }
   const [switchTo, setSwitchTo] = useState(null); // { group, env?, restore? }
+  const [running, setRunning] = useState(null); // { group, op }
   const [toDelete, setToDelete] = useState(null);
   const [collapsed, setCollapsedState] = useState(storedCollapsed);
   const setCollapsed = (fn) => setCollapsedState((c) => { const n = fn(c); saveCollapsed(n); return n; });
@@ -555,7 +638,7 @@ export default function Workspaces() {
       )}
       <Stack spacing={2}>
         {groups.map((g) => (
-          <GroupCard key={g.id} group={g} current={data.current} repoName={repoName} onOpenRepo={openRepo} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
+          <GroupCard key={g.id} group={g} current={data.current} state={data.state} repoName={repoName} onOpenRepo={openRepo} onRun={(op) => setRunning({ group: g, op })} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
             onEditGroup={() => setGroupDlg({ group: g })}
             onEditEnv={(env) => setEnvDlg({ group: g, env })}
             onNewEnv={(seed) => setEnvDlg({ group: g, seed })}
@@ -573,6 +656,7 @@ export default function Workspaces() {
         }} />
       <EnvDialog open={!!envDlg} group={envDlg?.group} env={envDlg?.env} seed={envDlg?.seed} repoName={repoName} current={data?.current || {}}
         onClose={() => setEnvDlg(null)} onSaved={(g) => { replaceGroup(g); setEnvDlg(null); }} />
+      <RunDialog target={running} onClose={() => setRunning(null)} onDone={load} />
       <SwitchDialog target={switchTo} onClose={() => { setSwitchTo(null); load(); }} onDone={(g) => replaceGroup(g)} />
 
       <Dialog open={!!toDelete} onClose={() => setToDelete(null)}>
