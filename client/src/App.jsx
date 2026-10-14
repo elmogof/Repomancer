@@ -18,6 +18,7 @@ import CollapseIcon from '@mui/icons-material/KeyboardDoubleArrowLeft';
 import ExpandIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import CommandIcon from '@mui/icons-material/KeyboardCommandKey';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
+import SearchCodeIcon from '@mui/icons-material/ManageSearch';
 import { api } from './api/client.js';
 import Login from './pages/Login.jsx';
 import RepoSearch from './components/RepoSearch.jsx';
@@ -32,6 +33,7 @@ import PullRequests from './pages/PullRequests.jsx';
 import OpLog from './pages/OpLog.jsx';
 import Accounts from './pages/Accounts.jsx';
 import Workspaces from './pages/Workspaces.jsx';
+import Search from './pages/Search.jsx';
 
 const DRAWER = 250;
 const DRAWER_MINI = 68;
@@ -49,6 +51,7 @@ function RepoDetailKeyed() {
 const nav = [
   { to: '/repos', label: 'Repositorios locales', icon: <FolderIcon /> },
   { to: '/workspaces', label: 'Entornos de trabajo', icon: <WorkspacesIcon /> },
+  { to: '/search', label: 'Buscar en repositorios', icon: <SearchCodeIcon /> },
   { to: '/projects', label: 'Proyectos GitLab', icon: <CloudIcon /> },
   { to: '/merge-requests', label: 'Merge requests', icon: <MergeIcon /> },
   { to: '/pull-requests', label: 'Pull requests (GitHub)', icon: <GitHubIcon /> },
@@ -61,6 +64,7 @@ function GlobalCommands({ onToggleMode, toggleNav }) {
   const navigate = useNavigate();
   useCommands('global', () => [
     ...nav.map((n, i) => ({ id: `nav:${n.to}`, group: 'Ir a', title: n.label, keys: `alt+${i + 1}`, icon: n.icon, run: () => navigate(n.to) })),
+    { id: 'search-code', group: 'General', title: 'Buscar texto o archivos en todos los repositorios', keys: 'ctrl+shift+f', run: () => navigate('/search') },
     { id: 'search', group: 'General', title: 'Buscar repositorio', keys: 'ctrl+k', passive: true, run: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })) },
     { id: 'autofetch', group: 'General', title: 'Buscar novedades en los remotos (fetch de todos)', run: () => window.dispatchEvent(new Event(AUTOFETCH_RUN)) },
     { id: 'theme', group: 'General', title: 'Cambiar tema claro / oscuro', keys: 'alt+t', run: onToggleMode },
@@ -183,6 +187,7 @@ export default function App({ mode, onToggleMode }) {
             <Route path="/repos" element={<Repos />} />
             <Route path="/repos/:id" element={<RepoDetailKeyed />} />
             <Route path="/workspaces" element={<Workspaces />} />
+            <Route path="/search" element={<Search />} />
             <Route path="/projects" element={needsGitlab(<Projects />)} />
             <Route path="/merge-requests" element={needsGitlab(<MergeRequests />)} />
             <Route path="/projects/:pid/merge-requests/:iid" element={needsGitlab(<MergeRequestDetail />)} />

@@ -561,7 +561,13 @@ r.post('/:id/open', async (req, res) => {
   const repo = getRepo(req.params.id);
   const target = req.body?.target;
   if (!TARGETS.includes(target)) throw bad('Destino no soportado');
-  await openIn(target, repo.path);
+  // Archivo y línea (desde la búsqueda): solo rutas dentro del repositorio.
+  const { file, line } = req.body || {};
+  if (file && target !== 'vscode') throw bad('Solo se puede abrir un archivo en VS Code');
+  // En Windows VS Code se lanza a través de cmd.exe: se rechazan nombres con caracteres especiales de cmd.
+  if (file && /[&|<>^%"!]/.test(file)) throw bad('Ese nombre de archivo no se puede abrir desde aquí');
+  const opts = file ? { file: path.resolve(repo.path, safePaths(repo, file)[0]), line: Number.isInteger(line) && line > 0 ? line : undefined } : {};
+  await openIn(target, repo.path, opts);
   res.json({ ok: true });
 });
 

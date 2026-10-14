@@ -41,6 +41,7 @@ export function run(cwd, args, { env, timeout = 5 * 60 * 1000, input } = {}) {
       if (err) {
         const e = new Error((stderr || stdout || err.message).trim());
         e.status = 400;
+        e.code = err.code; // código de salida de git (p. ej. 1 en git grep sin coincidencias)
         return reject(e);
       }
       resolve({ stdout, stderr });

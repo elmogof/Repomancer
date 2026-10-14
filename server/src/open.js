@@ -16,15 +16,19 @@ function launch(cmd, args, opts = {}) {
 
 export const TARGETS = ['folder', 'vscode', 'terminal'];
 
-export async function openIn(target, dir) {
+// file/line (opcional, solo VS Code): abre ese archivo en esa línea dentro de la carpeta del repositorio.
+export async function openIn(target, dir, { file, line } = {}) {
   switch (target) {
     case 'folder':
       if (win) return launch('explorer.exe', [dir]);
       return launch(mac ? 'open' : 'xdg-open', [dir]);
     case 'vscode':
       // "code" es un .cmd en Windows: hay que lanzarlo a través de cmd.exe.
-      if (win) return launch('cmd.exe', ['/d', '/c', 'code', dir], { windowsHide: true });
-      return launch('code', [dir]);
+      {
+        const args = [dir, ...(file ? ['-g', `${file}${line ? `:${line}` : ''}`] : [])];
+        if (win) return launch('cmd.exe', ['/d', '/c', 'code', ...args], { windowsHide: true });
+        return launch('code', args);
+      }
     case 'terminal':
       if (win) {
         // "start" crea una consola nueva con su propia entrada: lanzado directamente, PowerShell hereda la
