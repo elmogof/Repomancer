@@ -38,6 +38,7 @@ function Build-Client {
   try { npm run build --silent; if ($LASTEXITCODE) { throw 'Client build failed' } } finally { Pop-Location }
 }
 function Start-App {
+  if (Test-Up) { Write-Warning "Port $appPort is already in use (is 'npm run dev' running?). Stop it, then run: npm run startup:start"; return }
   Start-ScheduledTask -TaskName $TaskName
   if (Wait-Up) { Write-Host "Git Manager is running at $url" } else { Write-Warning "Started, but $url does not respond yet. Check server.log in your .git-manager folder." }
 }
@@ -49,6 +50,7 @@ function Stop-App {
   $procs = Get-CimInstance Win32_Process -Filter "Name='node.exe'"
   $launchers = @($procs | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($launch) })
   $ids = @($launchers.ProcessId) + @($procs | Where-Object { $launchers.ProcessId -contains $_.ParentProcessId } | ForEach-Object ProcessId)
+  $ids = @($ids | Where-Object { $_ })
   foreach ($id in $ids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
   if ($running -or $ids.Count) { Write-Host 'Stopped.' } else { Write-Host 'Not running.' }
 }
@@ -71,8 +73,7 @@ switch ($Command) {
       -Description "Starts the Git Manager server ($url) when you sign in. Project: $root" | Out-Null
     Set-Content -Path $shortcut -Value "[InternetShortcut]`r`nURL=$url/`r`n" -Encoding ASCII
     Write-Host "Task '$TaskName' installed; it will start when you sign in. Start menu shortcut: $TaskName"
-    if (Test-Up) { Write-Warning "Port $appPort is already in use (is 'npm run dev' running?). Stop it, then run: npm run startup:start" }
-    else { Start-App }
+    Start-App
   }
   'uninstall' {
     if (Get-Task) { Stop-App; Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false; Write-Host "Task '$TaskName' removed." }
