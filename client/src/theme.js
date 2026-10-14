@@ -148,7 +148,9 @@ export default function buildTheme(mode) {
           },
         },
       },
+      // Los menús no bloquean el scroll: así la barra no desaparece ni la página se desplaza al abrirlos.
       MuiMenu: {
+        defaultProps: { disableScrollLock: true },
         styleOverrides: {
           paper: {
             marginTop: 4,
@@ -160,6 +162,7 @@ export default function buildTheme(mode) {
         },
       },
       MuiPopover: {
+        defaultProps: { disableScrollLock: true },
         styleOverrides: { paper: { backgroundImage: 'none' } },
       },
       MuiDialog: {
