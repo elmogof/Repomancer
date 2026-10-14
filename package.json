@@ -2,6 +2,7 @@
   "name": "git-manager",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Gestor local de repositorios Git y GitLab (React + Node + Material UI)",
   "workspaces": ["server", "client"],
   "scripts": {

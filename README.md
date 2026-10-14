@@ -22,6 +22,7 @@ A local web app to manage all your Git repositories in one place, with built-in 
 - [npm scripts](#npm-scripts)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
@@ -318,4 +319,6 @@ git-manager/
 3. Write commit messages in English, in the imperative mood ("Add…", "Fix…"), with a short body when the change needs context.
 4. Open a pull request.
 
-There is no license file yet. Until one is added, all rights are reserved by the author.
+## License
+
+[MIT](LICENSE) © 2026 Máximo Javier Aráuz Vigil. You can use, copy, modify and share this software freely, as long as the license notice is kept.
