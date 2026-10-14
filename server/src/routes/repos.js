@@ -181,6 +181,11 @@ r.post('/remove-many', (req, res) => {
 // ---------- favoritos y etiquetas ----------
 const cleanLabels = (list) => [...new Set((Array.isArray(list) ? list : []).map((l) => String(l).trim().slice(0, 30)).filter(Boolean))].slice(0, 20);
 
+// Todas las etiquetas en uso (para sugerirlas al etiquetar desde el detalle de un repositorio).
+r.get('/labels', (req, res) => {
+  res.json([...new Set(load().repos.flatMap((x) => x.labels || []))].sort((a, b) => a.localeCompare(b, 'es')));
+});
+
 r.put('/:id/meta', (req, res) => {
   const { favorite, labels } = req.body || {};
   let out = null;
