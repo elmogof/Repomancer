@@ -3,7 +3,7 @@ import { Box, Button, Chip, Dialog, DialogContent, DialogTitle, LinearProgress, 
 import { api, qs } from '../api/client.js';
 import DiffView from './DiffView.jsx';
 
-export const fmtDate = (d) => new Date(d).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+export const fmtDate = (d) => new Date(d).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' });
 
 // Detalle de un commit: mensaje, autor y diff (opcionalmente limitado a un archivo, siguiendo su ruta anterior).
 // actions: [{ key, label, icon, desc, run }] se muestran como botones en la cabecera.

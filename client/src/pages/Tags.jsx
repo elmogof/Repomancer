@@ -11,7 +11,7 @@ import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from '../api/client.js';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
-const fmt = (d) => (d ? new Date(d).toLocaleDateString('es-CR', { dateStyle: 'medium' }) : '');
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('es', { dateStyle: 'medium' }) : '');
 
 // Tags locales, con su estado en origin (publicado o solo local).
 export default function Tags({ repoId, act, onNew, hasRemote, version }) {

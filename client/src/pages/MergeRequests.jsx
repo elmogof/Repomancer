@@ -77,7 +77,7 @@ export default function MergeRequests() {
                     <Chip size="small" color={STATE_COLOR[mr.state]} label={STATE_LABEL[mr.state] || mr.state} />
                     {mr.draft && <Chip size="small" variant="outlined" label="Draft" />}
                   </Stack>}
-                  secondary={`${mr.references?.full || '!' + mr.iid} · ${mr.source_branch} → ${mr.target_branch} · ${mr.author?.name} · ${new Date(mr.updated_at).toLocaleString('es-CR')}`} />
+                  secondary={`${mr.references?.full || '!' + mr.iid} · ${mr.source_branch} → ${mr.target_branch} · ${mr.author?.name} · ${new Date(mr.updated_at).toLocaleString('es')}`} />
               </ListItemButton>
             ))}
           </List>

@@ -11,7 +11,7 @@ import { api, qs } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
-const fmt = (d) => new Date(d).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'medium' });
+const fmt = (d) => new Date(d).toLocaleString('es', { dateStyle: 'short', timeStyle: 'medium' });
 const dur = (ms) => (ms == null ? '' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
 // Registro de operaciones: qué se ejecutó, sobre qué repo, cuándo y con qué resultado.

@@ -110,7 +110,7 @@ export default function MergeRequestDetail() {
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <Avatar src={n.author.avatar_url} sx={{ width: 24, height: 24 }} />
                 <b>{n.author.name}</b>
-                <Typography variant="caption" color="text.secondary">{new Date(n.created_at).toLocaleString('es-CR')}</Typography>
+                <Typography variant="caption" color="text.secondary">{new Date(n.created_at).toLocaleString('es')}</Typography>
                 {n.position && <Chip size="small" variant="outlined" label={`${n.position.new_path}:${n.position.new_line || n.position.old_line}`} />}
               </Stack>
               <Box component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', m: 0 }}>{n.body}</Box>

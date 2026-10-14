@@ -18,7 +18,7 @@ import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api/client.js';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
-const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('es-CR', { dateStyle: 'medium' }) : '');
+const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('es', { dateStyle: 'medium' }) : '');
 
 // Limpieza de ramas: locales fusionadas o cuyo remoto desapareció, y (solo si se eligen) ramas remotas fusionadas.
 function CleanupDialog({ open, repoId, onClose, act, onDone, notify }) {
@@ -287,7 +287,7 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
                 {b.current && <Chip size="small" color="primary" label="actual" />}
                 {!b.remote && !b.upstream && <Chip size="small" variant="outlined" label="sin publicar" sx={{ height: 20, fontSize: 11 }} />}
               </Stack>}
-              secondary={`${b.subject || ''} · ${b.date ? new Date(b.date).toLocaleDateString('es-CR') : ''}`}
+              secondary={`${b.subject || ''} · ${b.date ? new Date(b.date).toLocaleDateString('es') : ''}`}
               secondaryTypographyProps={{ noWrap: true }} sx={{ pr: (b.current ? 5 : 17) + (!b.remote && !b.upstream ? 4 : 0) + (!b.remote && !b.current ? 4 : 0) }} />
           </ListItem>
         ))}

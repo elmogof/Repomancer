@@ -9,7 +9,7 @@ import { api } from '../api/client.js';
 import DiffView from '../components/DiffView.jsx';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 
-const fmt = (d) => new Date(d).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+const fmt = (d) => new Date(d).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' });
 
 // Lista de stashes con su diff; aplicar, aplicar y eliminar (pop) o eliminar.
 export default function Stashes({ repoId, act, onNew, version }) {

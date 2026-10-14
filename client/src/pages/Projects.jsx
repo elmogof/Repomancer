@@ -69,7 +69,7 @@ export default function Projects() {
               </Stack>
             }>
               <ListItemAvatar><Avatar variant="rounded" src={p.avatar_url}>{p.name[0]?.toUpperCase()}</Avatar></ListItemAvatar>
-              <ListItemText primary={p.name_with_namespace} secondary={[p.description, `actividad ${new Date(p.last_activity_at).toLocaleDateString('es-CR')}`].filter(Boolean).join(' · ')} secondaryTypographyProps={{ noWrap: true }} sx={{ pr: 24 }} />
+              <ListItemText primary={p.name_with_namespace} secondary={[p.description, `actividad ${new Date(p.last_activity_at).toLocaleDateString('es')}`].filter(Boolean).join(' · ')} secondaryTypographyProps={{ noWrap: true }} sx={{ pr: 24 }} />
             </ListItem>
           ))}
           {loaded && !loading && items.length === 0 && <Typography color="text.secondary" sx={{ p: 2 }}>No se encontraron proyectos.</Typography>}

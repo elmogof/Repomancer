@@ -10,7 +10,7 @@ import ListSkeleton from '../components/ListSkeleton.jsx';
 
 const cache = new Map();
 
-const fmt = (d) => new Date(d).toLocaleDateString('es-CR', { dateStyle: 'medium' });
+const fmt = (d) => new Date(d).toLocaleDateString('es', { dateStyle: 'medium' });
 const host = (url) => { try { return new URL(url).host; } catch { return url; } };
 
 // Pull requests de GitHub en los que participas, de todas las cuentas de GitHub añadidas.

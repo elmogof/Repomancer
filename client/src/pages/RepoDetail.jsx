@@ -403,7 +403,7 @@ export default function RepoDetail() {
                           primary={c.subject}
                           secondary={<>
                             <Box component="span" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, color: 'primary.main' }}>{c.short}</Box>
-                            {` · ${new Date(c.date).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' })} · ${c.files} ${c.files === 1 ? 'archivo' : 'archivos'} `}
+                            {` · ${new Date(c.date).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })} · ${c.files} ${c.files === 1 ? 'archivo' : 'archivos'} `}
                             <Box component="span" sx={{ color: 'success.main' }}>+{c.insertions}</Box>{' '}
                             <Box component="span" sx={{ color: 'error.main' }}>−{c.deletions}</Box>
                           </>}
@@ -456,7 +456,7 @@ export default function RepoDetail() {
                     <Chip size="small" variant="outlined" label="Pendiente de push" />
                   </Stack>
                   <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
-                    {commitSel.author} · {new Date(commitSel.date).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {commitSel.author} · {new Date(commitSel.date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}
                   </Typography>
                   {commitSel.loading ? <LinearProgress /> : (
                     <>
