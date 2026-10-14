@@ -34,7 +34,7 @@ export function accountForHost(host, provider) {
   return accounts().find((a) => (!provider || a.provider === provider) && hostOf(a.url) === h) || null;
 }
 
-async function verify(provider, url, token) {
+export async function verifyToken(provider, url, token) {
   const endpoint = provider === 'github' ? `${githubApiBase(url)}/user` : `${url.replace(/\/+$/, '')}/api/v4/user`;
   const headers = provider === 'github'
     ? { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
@@ -55,7 +55,7 @@ export async function addAccount({ provider, url, token }) {
   const host = hostOf(clean);
   if (provider === 'gitlab' && host === hostOf(load().gitlab.url)) throw bad('Esa es tu instancia principal de GitLab: ya tiene sesión');
   if (accountForHost(host, provider)) throw bad(`Ya hay una cuenta de ${host}. Quítala antes de añadir otra.`);
-  const user = await verify(provider, clean, token.trim());
+  const user = await verifyToken(provider, clean, token.trim());
   const account = { id: crypto.randomUUID(), provider, url: clean, token: token.trim(), user, addedAt: new Date().toISOString() };
   update((c) => { c.accounts = [...(c.accounts || []), account]; });
   return publicAccount(account);

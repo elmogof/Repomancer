@@ -52,8 +52,8 @@ export default function PullRequests() {
       {!data ? (
         <Paper variant="outlined"><List disablePadding><ListSkeleton avatar={false} /></List></Paper>
       ) : !data.length ? (
-        <Alert severity="info" action={<Button color="inherit" onClick={() => navigate('/accounts')}>Ir a Cuentas</Button>}>
-          Añade una cuenta de GitHub (con su token personal) para ver y crear pull requests desde aquí.
+        <Alert severity="info" action={<Button color="inherit" onClick={() => navigate('/connect/github')}>Iniciar sesión con GitHub</Button>}>
+          Conecta tu cuenta de GitHub para ver y crear pull requests desde aquí.
         </Alert>
       ) : data.map((group, i) => (
         <Box key={group.account?.id || i} sx={{ mb: 3 }}>

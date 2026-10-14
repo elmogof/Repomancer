@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress,
   List, ListItem, ListItemAvatar, ListItemText, MenuItem, Paper, Stack, TextField, Tooltip, Typography,
@@ -26,6 +27,7 @@ export default function Accounts() {
   const [busy, setBusy] = useState(false);
   const [toRemove, setToRemove] = useState(null);
   const notify = useNotify();
+  const navigate = useNavigate();
 
   const load = () => api.get('/accounts').then(setData).catch((e) => notify(e.message, 'error'));
   useEffect(() => { load(); }, []);
@@ -46,7 +48,9 @@ export default function Accounts() {
   };
 
   const row = (a, main) => (
-    <ListItem key={a.id || 'main'} divider secondaryAction={!main && (
+    <ListItem key={a.id || 'main'} divider secondaryAction={main ? (!a.user && (
+      <Button size="small" variant="outlined" onClick={() => navigate('/connect/gitlab')}>Conectar GitLab</Button>
+    )) : (
       <Tooltip title="Quitar cuenta"><IconButton onClick={() => setToRemove(a)}><DeleteIcon /></IconButton></Tooltip>
     )}>
       <ListItemAvatar><Avatar src={a.user?.avatar_url}>{a.provider === 'github' ? <GitHubIcon /> : <CloudIcon />}</Avatar></ListItemAvatar>
@@ -54,7 +58,7 @@ export default function Accounts() {
         primary={<Stack direction="row" spacing={1} alignItems="center">
           <span>{host(a.url)}</span>
           <Chip size="small" variant="outlined" icon={a.provider === 'github' ? <GitHubIcon /> : <CloudIcon />} label={a.provider === 'github' ? 'GitHub' : 'GitLab'} />
-          {main && <Chip size="small" color="primary" label="Sesión principal" />}
+          {(main ? !!a.user : a.login) && <Chip size="small" color="primary" label="Sesión principal" />}
         </Stack>}
         secondary={a.user ? `@${a.user.username}${a.user.name ? ` · ${a.user.name}` : ''}` : 'Sin sesión'} />
     </ListItem>

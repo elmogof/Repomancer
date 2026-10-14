@@ -35,6 +35,11 @@ const DRAWER = 250;
 const DRAWER_MINI = 68;
 
 // Remonta el detalle al cambiar de repositorio (p. ej. desde el buscador) para no arrastrar estado.
+function ConnectProvider({ auth, onLoggedIn }) {
+  const { provider } = useParams();
+  return <Login key={provider} auth={auth} onLoggedIn={onLoggedIn} embedded only={provider === 'github' ? 'github' : 'gitlab'} />;
+}
+
 function RepoDetailKeyed() {
   const { id } = useParams();
   return <RepoDetail key={id} />;
@@ -80,7 +85,12 @@ export default function App({ mode, onToggleMode }) {
   useEffect(() => { setMobileOpen(false); }, [loc.pathname]);
 
   if (!auth) return <Box sx={{ display: 'grid', placeItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
-  if (!auth.user) return <Login auth={auth} onLoggedIn={refresh} />;
+  // Se entra con GitLab o con GitHub; la otra cuenta se puede conectar después.
+  const me = auth.user || auth.github?.user;
+  if (!me) return <Login auth={auth} onLoggedIn={refresh} />;
+  // Las pantallas de GitLab piden conectar GitLab si se entró solo con GitHub.
+  const needsGitlab = (el) => (auth.user ? el : <Login auth={auth} onLoggedIn={refresh} embedded only="gitlab" />);
+  const sessionHost = auth.user ? auth.url : auth.github?.url;
 
   const logout = async () => { setMenu(null); await api.post('/auth/logout'); navigate('/'); refresh(); };
   const mini = collapsed && !mobile;
@@ -130,11 +140,14 @@ export default function App({ mode, onToggleMode }) {
             </Tooltip>
             <AutoFetchWatcher />
             <AutoFetchButton />
-            <Typography variant="body2" color="text.secondary" sx={{ mr: 2, px: 1.5, py: 0.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'action.hover', display: { xs: 'none', lg: 'block' } }}>{auth.url}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mr: 2, px: 1.5, py: 0.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'action.hover', display: { xs: 'none', lg: 'block' } }}>{sessionHost}</Typography>
             <Tooltip title="Cambiar tema (Alt+T)"><IconButton onClick={onToggleMode} sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>{mode === 'dark' ? <LightIcon /> : <DarkIcon />}</IconButton></Tooltip>
-            <IconButton onClick={(e) => setMenu(e.currentTarget)}><Avatar src={auth.user.avatar_url} sx={{ width: 32, height: 32 }} /></IconButton>
+            <IconButton onClick={(e) => setMenu(e.currentTarget)}><Avatar src={me.avatar_url} sx={{ width: 32, height: 32 }} /></IconButton>
             <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
-              <MenuItem disabled>{auth.user.name} (@{auth.user.username}) · {auth.authType === 'oauth' ? 'OAuth' : 'Token personal'}</MenuItem>
+              {auth.user && <MenuItem disabled>GitLab · {auth.user.name} (@{auth.user.username}) · {auth.authType === 'oauth' ? 'OAuth' : 'Token personal'}</MenuItem>}
+              {auth.github && <MenuItem disabled>GitHub · {auth.github.user?.name} (@{auth.github.user?.username}) · {auth.github.authType === 'oauth' ? 'OAuth' : 'Token personal'}</MenuItem>}
+              {!auth.user && <MenuItem onClick={() => { setMenu(null); navigate('/connect/gitlab'); }}>Conectar GitLab</MenuItem>}
+              {!auth.github && <MenuItem onClick={() => { setMenu(null); navigate('/connect/github'); }}>Conectar GitHub</MenuItem>}
               <MenuItem onClick={() => { setMenu(null); navigate('/accounts'); }}>Cuentas</MenuItem>
               <MenuItem onClick={() => { setMenu(null); onToggleMode(); }} sx={{ display: { sm: 'none' } }}>Cambiar tema</MenuItem>
               <MenuItem onClick={logout}>Cerrar sesión</MenuItem>
@@ -164,9 +177,12 @@ export default function App({ mode, onToggleMode }) {
           <Routes>
             <Route path="/repos" element={<Repos />} />
             <Route path="/repos/:id" element={<RepoDetailKeyed />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/merge-requests" element={<MergeRequests />} />
-            <Route path="/projects/:pid/merge-requests/:iid" element={<MergeRequestDetail />} />
+            <Route path="/projects" element={needsGitlab(<Projects />)} />
+            <Route path="/merge-requests" element={needsGitlab(<MergeRequests />)} />
+            <Route path="/projects/:pid/merge-requests/:iid" element={needsGitlab(<MergeRequestDetail />)} />
+            {/* Conectar el proveedor que falta. /login recibe también los errores del OAuth de GitLab. */}
+            <Route path="/login" element={<Login auth={auth} onLoggedIn={() => { refresh(); navigate('/repos'); }} embedded only="gitlab" />} />
+            <Route path="/connect/:provider" element={<ConnectProvider auth={auth} onLoggedIn={() => { refresh(); navigate('/repos'); }} />} />
             <Route path="/pull-requests" element={<PullRequests />} />
             <Route path="/oplog" element={<OpLog />} />
             <Route path="/accounts" element={<Accounts />} />
