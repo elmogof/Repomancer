@@ -287,7 +287,7 @@ export default function Repos() {
                 sx={{ ...chipSx(on, labelColor(l)), '& .MuiChip-icon': { color: 'inherit' } }} />
             );
           })}
-          {anyFilter && <Button size="small" onClick={() => { setFilter(''); setView({ status: 'all', favorites: false, labels: [] }); }}>Quitar filtros</Button>}
+          {anyFilter && <Button size="small" sx={{ height: 26, py: 0 }} onClick={() => { setFilter(''); setView({ status: 'all', favorites: false, labels: [] }); }}>Quitar filtros</Button>}
         </Stack>
       )}
 
@@ -319,19 +319,23 @@ export default function Repos() {
                   <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}><Checkbox size="small" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></TableCell>
                   <TableCell sx={{ maxWidth: 0 }}>
                     <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" sx={{ minWidth: 0, columnGap: 1, rowGap: 0.5 }}>
-                      <Tooltip title={r.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
-                        <IconButton size="small" className={r.favorite ? '' : 'fav-off'} onClick={(e) => { e.stopPropagation(); setFavorite(r); }}
-                          sx={{ p: 0.25, ml: -0.75, color: r.favorite ? '#F1A20D' : 'text.secondary', transition: 'opacity .15s' }} aria-label="Favorito">
-                          {r.favorite ? <StarIcon sx={{ fontSize: 18 }} /> : <StarOutlineIcon sx={{ fontSize: 18 }} />}
-                        </IconButton>
-                      </Tooltip>
                       <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}><Highlight text={r.name} words={words} /></Typography>
-                      {r.branch && (
-                        <Tooltip title={r.branch}>
-                          <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={<Highlight text={r.branch} words={words} />}
-                            sx={{ height: 20, fontSize: 11, maxWidth: { xs: '100%', xl: 560 }, minWidth: 0 }} />
+                      {/* La estrella va a la derecha de la rama (no delante del nombre) para que el nombre quede alineado con la ruta;
+                          rama y estrella van juntas para que la estrella no quede sola en otra línea. */}
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, maxWidth: '100%' }}>
+                        {r.branch && (
+                          <Tooltip title={r.branch}>
+                            <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={<Highlight text={r.branch} words={words} />}
+                              sx={{ height: 20, fontSize: 11, maxWidth: { xs: '100%', xl: 560 }, minWidth: 0 }} />
+                          </Tooltip>
+                        )}
+                        <Tooltip title={r.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
+                          <IconButton size="small" className={r.favorite ? '' : 'fav-off'} onClick={(e) => { e.stopPropagation(); setFavorite(r); }}
+                            sx={{ p: 0.25, flexShrink: 0, color: r.favorite ? '#F1A20D' : 'text.secondary', transition: 'opacity .15s' }} aria-label="Favorito">
+                            {r.favorite ? <StarIcon sx={{ fontSize: 18 }} /> : <StarOutlineIcon sx={{ fontSize: 18 }} />}
+                          </IconButton>
                         </Tooltip>
-                      )}
+                      </Stack>
                       {r.labels?.map((l) => (
                         <Chip key={l} size="small" variant="outlined" label={<Highlight text={l} words={words} />}
                           onClick={(e) => { e.stopPropagation(); setView((v) => ({ ...v, labels: v.labels.includes(l) ? v.labels : [...v.labels, l] })); }}

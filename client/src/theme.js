@@ -66,6 +66,9 @@ export default function buildTheme(mode) {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
+          // Reserva siempre el hueco de la barra de desplazamiento: si una lista se acorta (p. ej. al filtrar),
+          // la página no se desplaza a los lados al desaparecer la barra.
+          html: { scrollbarGutter: 'stable' },
           body: {
             backgroundColor: dark ? '#0B0D0E' : '#fff',
             backgroundImage: dark
