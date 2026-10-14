@@ -12,6 +12,9 @@ A local web app to manage all your Git repositories in one place, with built-in 
 
 - [Features](#features)
   - [Work environments](#work-environments-entornos-de-trabajo)
+  - [Search across repositories](#search-across-repositories)
+  - [Commit conventions](#commit-conventions)
+  - [Search options](#search-options)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Running the app](#running-the-app)
@@ -38,6 +41,7 @@ A local web app to manage all your Git repositories in one place, with built-in 
   - last commit date and author.
 - Search by name, path, branch, label, or last commit author and message:
   - multi-word and accent-insensitive;
+  - VS Code-style options inside the field: **Aa** match case, **ab** whole word, **.\*** regular expression (also `Alt+C`, `Alt+W`, `Alt+R`);
   - matching text is highlighted;
   - the search survives navigation and page reloads.
 - Status filters (with changes, behind, ahead, unpublished), plus **favorites** (always shown first) and colored **labels** to group repositories by client, project or team.
@@ -68,12 +72,35 @@ For apps made of several repositories, where each environment uses different bra
 - Click a repository in the table to open its detail; going back returns to the work environments.
 - Cards can be collapsed to just the name, status and environment buttons (switching still takes one click). Each card remembers its state, and you can collapse or expand them all at once.
 - Switch from the command palette ("Portal → QA"). Each switch is recorded in the operation log.
+- **Group status at a glance:** each card shows how many repositories have uncommitted changes, commits to push or to pull, or "Todo al día". The table shows the same per repository (●changes ↑ahead ↓behind).
+- **Deleted branches are flagged:** an environment whose branch no longer exists locally or on origin shows a warning, with the affected repositories in its tooltip and "no existe" in the table, before you try to switch.
+- **Fetch, pull and push the whole group** with one click. Pull is fast-forward only, and push only sends branches that are already published and have commits to push.
+
+### Search across repositories
+
+- Search text inside the files of every repository at once, or only in one group's repositories (`Ctrl+Shift+F`).
+- Options inside the field, as in VS Code: **Aa** match case, **ab** whole word, **.\*** regular expression. Optionally limit it to file patterns or folders (for example `*.js src/`).
+- Or search file names: multi-word and accent-insensitive by default, with the same options.
+- Includes uncommitted files and skips anything ignored by `.gitignore`.
+- Results are grouped by repository and file with the matches highlighted. Click a line to open the file in VS Code at that line.
+
+### Commit conventions
+
+Set them for all repositories in **Configuración → Commits**, or per repository from the settings button in its commit box.
+
+- **Ticket from the branch:** on a branch like `INC033` or `feature/PAG-112-checkout`, the commit box shows the ticket and adds it when you commit, unless the message already has it. It can go at the start of the summary (`fix(pagos): INC033 corrige el total`), at the end (`… (INC033)`) or in a footer (`Refs: INC033`). Click the ticket chip to skip it for one commit. The ticket pattern is a regular expression you can change.
+- **Type and scope picker:** Conventional Commits types (`feat`, `fix`, `docs`…), plus your team's suggested scopes, so `feat(pagos): …` is one click. A warning appears when the summary doesn't follow the format (it can be turned off).
+- **Message template:** a team template with `{ticket}`, `{branch}` and `{type}`, inserted with a button or automatically when you start writing.
+
+### Search options
+
+The repository list, branch search, History message search, the add-repositories filter and **Buscar en repositorios** all have the VS Code toggles **Aa** (match case), **ab** (whole word) and **.\*** (regular expression) inside the field, with `Alt+C`, `Alt+W` and `Alt+R` while typing. Each search bar remembers its options. An invalid regular expression turns the field red.
 
 ### Repository detail
 
 | Tab | What you can do |
 |---|---|
-| **Cambios** (changes) | Stage or unstage files and **individual lines**. View diffs, discard changes, and commit (or commit and push, or amend). Commit messages can be generated from the diff following Conventional Commits. |
+| **Cambios** (changes) | Stage or unstage files and **individual lines**. View diffs, discard changes, and commit (or commit and push, or amend). Commit messages can be generated from the diff following Conventional Commits. See [Commit conventions](#commit-conventions). |
 | **Historial** (history) | Branch graph and commit list with filters (message, author, file, date range, all branches) and the diff of each commit. From a commit you can revert, cherry-pick, undo the last commit, tag, or compare. |
 | **Ramas** (branches) | Search local and remote branches and check out any of them. Create a branch from **any base**, optionally switching to it and publishing it. Merge (with `--no-ff` if you want), compare, **publish** unpublished branches, and **delete** local branches, with a confirmation and force option when unmerged; the current branch can't be deleted. Bulk-clean merged or gone branches. |
 | **Comparar** (compare) | Compare two branches, tags or commits: the commits in between and the full diff. |
@@ -112,6 +139,7 @@ Also in the repository detail:
 - **Command palette:** `Ctrl+Shift+P`, `F1` or `?` gives every action with its shortcut. See [Keyboard shortcuts](#keyboard-shortcuts).
 - **Auto-fetch** runs in the background on all repositories (every 10 minutes by default; configurable or can be turned off) so the ↓ counts stay current.
 - The **operation log** records every Git operation (fetch, pull, push, commit, merge, branch deletion and so on) with its result and output.
+- A **Configuración** (settings) page gathers the theme, clone folder, pull mode, auto-fetch, the default work-environment switch options and the commit conventions, and shows where the app keeps its data.
 - Light and dark themes, a collapsible sidebar, a mobile-friendly layout, smooth screen transitions and loading placeholders.
 
 ## Requirements
@@ -295,11 +323,11 @@ All of these live in `GIT_MANAGER_HOME` (`C:\Users\<you>\.git-manager` on Window
 | `oplog.json` | The operation log (most recent entries) |
 | `server.log` | Server output when started by the Windows task. It rotates at 1 MB to `server.old.log`. |
 
-The sort order, filters, pull options and theme are stored in your browser.
+The sort order, filters, pull options, work-environment switch options and theme are stored in your browser. You can change them all in **Configuración**.
 
 ### Auto-fetch
 
-Click the cloud icon in the top bar to turn auto-fetch on or off and choose the interval. It runs on the server, so it keeps going while the browser tab is closed, as long as the server is running.
+Click the cloud icon in the top bar, or open **Configuración**, to turn auto-fetch on or off and choose the interval. It runs on the server, so it keeps going while the browser tab is closed, as long as the server is running.
 
 ## Keyboard shortcuts
 
@@ -309,7 +337,8 @@ Shortcuts without `Ctrl` or `Alt` only work when you're not typing in a field. `
 |---|---|---|
 | Anywhere | `Ctrl+K` | Search repositories |
 | Anywhere | `Ctrl+Shift+P`, `F1`, `?` | Command palette |
-| Anywhere | `Alt+1` … `Alt+7` | Go to a section |
+| Anywhere | `Alt+1` … `Alt+9` | Go to a section |
+| Anywhere | `Ctrl+Shift+F` | Search text or files across repositories |
 | Anywhere | `Alt+T` / `Alt+M` | Toggle the theme / the sidebar |
 | Repository list | `/` | Search in the list |
 | Repository list | `a` / `n` / `r` | Add repositories / clone / refresh |
@@ -346,14 +375,16 @@ git-manager/
 │       ├── autofetch.js     # background fetch scheduler
 │       ├── oplog.js         # operation log
 │       ├── commitmsg.js     # commit message suggestions
+│       ├── commitSettings.js # commit conventions (general and per repository)
 │       ├── scan.js          # finds repositories inside a folder
 │       ├── open.js          # opens folder, VS Code or terminal
-│       └── routes/          # auth, repos, workspaces, gitlab, github, accounts, fs, auto-fetch, oplog
+│       └── routes/          # auth, repos, workspaces, search, gitlab, github, accounts, fs, auto-fetch, oplog
+│   └── tests/               # automated tests (node:test) against throwaway repositories
 └── client/                  # React + Vite + Material UI
     └── src/
         ├── App.jsx          # layout, navigation, routes
         ├── theme.js         # light and dark themes
-        ├── pages/           # Login, Repos, Workspaces, RepoDetail, History, Branches, Compare, FileHistory,
+        ├── pages/           # Login, Repos, Workspaces, Search, Settings, RepoDetail, History, Branches, Compare, FileHistory,
         │                    # Stashes, Tags, Projects, MergeRequests, PullRequests, OpLog, Accounts
         └── components/      # DiffView, ConflictResolver, CommitBox, dialogs, command palette…
 ```
@@ -364,6 +395,7 @@ git-manager/
 |---|---|
 | `npm run dev` | Server and client in development mode (port 5173) |
 | `npm run build` | Builds the client into `client/dist` |
+| `npm test` | Runs the server tests (work environments, search, commit conventions, history search) on temporary repositories with an isolated server |
 | `npm start` | Builds and runs the production server (port 4000) |
 | `npm run startup:install` | Installs the Windows sign-in task and the Start menu shortcut |
 | `npm run startup:start` / `npm run startup:stop` / `npm run startup:restart` / `npm run startup:status` / `npm run startup:uninstall` | Manage the sign-in task |
@@ -382,7 +414,7 @@ git-manager/
 ## Contributing
 
 1. Create a branch from `main`.
-2. Run `npm run dev` and test against **throwaway repositories**, not real ones.
+2. Run `npm run dev` and test against **throwaway repositories**, not real ones. Run `npm test` before committing; the tests create their own temporary repositories and server, and never touch your configuration.
 3. Write commit messages in English, in the imperative mood ("Add…", "Fix…"), with a short body when the change needs context.
 4. Open a pull request.
 
