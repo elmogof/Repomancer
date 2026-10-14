@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress,
-  InputAdornment, Paper, Stack, Table, TableSortLabel, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
+  InputAdornment, Paper, Portal, Stack, Table, TableSortLabel, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/CreateNewFolder';
@@ -17,6 +17,7 @@ import StarOutlineIcon from '@mui/icons-material/StarBorder';
 import LabelIcon from '@mui/icons-material/LabelOutlined';
 import PullIcon from '@mui/icons-material/Download';
 import FetchIcon from '@mui/icons-material/Sync';
+import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import { api } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import CloneDialog from '../components/CloneDialog.jsx';
@@ -75,6 +76,18 @@ export default function Repos() {
   const notify = useNotify();
   const navigate = useNavigate();
   const filterRef = useRef(null);
+  // Posición horizontal de la página, para que la barra flotante tenga su mismo ancho (cambia al plegar el menú lateral).
+  const pageRef = useRef(null);
+  const [pageRect, setPageRect] = useState(null);
+  useEffect(() => {
+    if (!selected.size || !pageRef.current) return undefined;
+    const measure = () => { const r = pageRef.current?.getBoundingClientRect(); if (r) setPageRect({ left: r.left, width: r.width }); };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(pageRef.current);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [selected.size > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(() => {
     setLoading(true);
@@ -212,9 +225,9 @@ export default function Repos() {
   });
 
   return (
-    <Box>
-      {/* La barra de selección se superpone a la cabecera (misma altura) para que la tabla no se desplace al seleccionar. */}
-      <Box sx={{ position: 'relative', mb: 2 }}>
+    // Con selección se deja sitio abajo para que la barra flotante no tape las últimas filas.
+    <Box ref={pageRef} sx={{ pb: selected.size ? 9 : 0 }}>
+      <Box sx={{ mb: 2 }}>
         <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>Repositorios locales</Typography>
           {repos.length > 0 && (
@@ -245,27 +258,6 @@ export default function Repos() {
           <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setAddOpen(true)}>Añadir repositorios</Button>
           <Button startIcon={<CloneIcon />} variant="contained" onClick={() => setCloneOpen(true)}>Clonar</Button>
         </Stack>
-        {selected.size > 0 && (
-          <Paper variant="outlined" sx={{
-            position: 'absolute', inset: 0, zIndex: 1, px: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderColor: 'primary.main',
-            bgcolor: 'background.default', backgroundImage: (t) => `linear-gradient(${t.palette.primary.main}1f, ${t.palette.primary.main}1f)`,
-          }}>
-            <Typography variant="body2" fontWeight={600} sx={{ flexGrow: 1 }}>
-              {selected.size === 1 ? '1 repositorio seleccionado' : `${selected.size} repositorios seleccionados`}
-            </Typography>
-            {bulk && <Typography variant="body2" color="text.secondary">{bulk.op === 'pull' ? 'Pull' : 'Fetch'} {bulk.done}/{bulk.total}…</Typography>}
-            <Button size="small" variant="outlined" startIcon={<FetchIcon />} disabled={!!bulk} onClick={() => bulkSync('fetch')}>Fetch</Button>
-            <Button size="small" variant="outlined" startIcon={<PullIcon />} disabled={!!bulk} onClick={() => bulkSync('pull')}>Pull</Button>
-            <Tooltip title={selectedRepos.every((r) => r.favorite) ? 'Quitar de favoritos' : 'Marcar como favoritos'}>
-              <Button size="small" variant="outlined" startIcon={selectedRepos.every((r) => r.favorite) ? <StarIcon /> : <StarOutlineIcon />}
-                onClick={() => bulkFavorite(!selectedRepos.every((r) => r.favorite))}>Favorito</Button>
-            </Tooltip>
-            <Button size="small" variant="outlined" startIcon={<LabelIcon />} onClick={() => setLabelsFor(selectedRepos)}>Etiquetas</Button>
-            <Button size="small" color="error" variant="outlined" disabled={!!bulk} startIcon={<RemoveIcon />}
-              onClick={() => setToRemove(selectedRepos)}>Quitar de la lista</Button>
-            <Tooltip title="Limpiar selección"><IconButton size="small" onClick={() => setSelected(new Set())}><CloseIcon fontSize="small" /></IconButton></Tooltip>
-          </Paper>
-        )}
       </Box>
 
       {repos.length > 0 && (
@@ -346,7 +338,7 @@ export default function Repos() {
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap', width: 1, display: { xs: 'none', md: 'table-cell' } }}>
                     {r.lastCommit ? (
-                      <Tooltip title={<>{r.lastCommit.subject}<br />{new Date(r.lastCommit.date).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' })}</>}>
+                      <Tooltip title={<>{r.lastCommit.subject}<br />{new Date(r.lastCommit.date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</>}>
                         <Box>
                           <Typography variant="body2" fontSize={13}>{ago(r.lastCommit.date)}</Typography>
                           <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ maxWidth: 160 }}><Highlight text={r.lastCommit.author} words={words} /></Typography>
@@ -398,6 +390,38 @@ export default function Repos() {
           <Button color="error" variant="contained" onClick={confirmRemove}>Quitar {toRemove?.length > 1 ? toRemove.length : ''}</Button>
         </DialogActions>
       </Dialog>
+      {/* Barra de selección flotante, fija abajo y con el ancho de la página. Va en un portal: el contenedor de la
+          página tiene una animación de entrada (transform) que haría que "fixed" se colocara respecto a él y no a la ventana. */}
+      {selected.size > 0 && pageRect && (
+        <Portal>
+          <Paper variant="outlined" sx={{
+            position: 'fixed', zIndex: (t) => t.zIndex.appBar - 1, bottom: { xs: 12, sm: 20 }, left: pageRect.left, width: pageRect.width,
+            minHeight: 48, px: 2, py: 0.75, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, borderColor: 'primary.main',
+            bgcolor: 'background.default', backgroundImage: (t) => `linear-gradient(${t.palette.primary.main}1f, ${t.palette.primary.main}1f)`,
+            boxShadow: (t) => `0 8px 32px ${alpha('#000', t.palette.mode === 'dark' ? 0.55 : 0.18)}`,
+            '@keyframes gm-bar-in': { from: { opacity: 0, transform: 'translateY(12px)' }, to: { opacity: 1, transform: 'none' } },
+            animation: 'gm-bar-in .2s cubic-bezier(.2,.7,.3,1)', '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}>
+            <Typography variant="body2" fontWeight={600} sx={{ flexGrow: 1 }}>
+              {selected.size === 1 ? '1 repositorio seleccionado' : `${selected.size} repositorios seleccionados`}
+            </Typography>
+            {bulk && <Typography variant="body2" color="text.secondary">{bulk.op === 'pull' ? 'Pull' : 'Fetch'} {bulk.done}/{bulk.total}…</Typography>}
+            <Button size="small" variant="outlined" startIcon={<FetchIcon />} disabled={!!bulk} onClick={() => bulkSync('fetch')}>Fetch</Button>
+            <Button size="small" variant="outlined" startIcon={<PullIcon />} disabled={!!bulk} onClick={() => bulkSync('pull')}>Pull</Button>
+            <Tooltip title={selectedRepos.every((r) => r.favorite) ? 'Quitar de favoritos' : 'Marcar como favoritos'}>
+              <Button size="small" variant="outlined" startIcon={selectedRepos.every((r) => r.favorite) ? <StarIcon /> : <StarOutlineIcon />}
+                onClick={() => bulkFavorite(!selectedRepos.every((r) => r.favorite))}>Favorito</Button>
+            </Tooltip>
+            <Button size="small" variant="outlined" startIcon={<LabelIcon />} onClick={() => setLabelsFor(selectedRepos)}>Etiquetas</Button>
+            <Tooltip title="Crear un grupo con estos repositorios para cambiarlos de rama juntos">
+              <Button size="small" variant="outlined" startIcon={<WorkspacesIcon />} onClick={() => navigate(`/workspaces?new=${[...selected].join(',')}`)}>Crear grupo</Button>
+            </Tooltip>
+            <Button size="small" color="error" variant="outlined" disabled={!!bulk} startIcon={<RemoveIcon />}
+              onClick={() => setToRemove(selectedRepos)}>Quitar de la lista</Button>
+            <Tooltip title="Limpiar selección"><IconButton size="small" onClick={() => setSelected(new Set())}><CloseIcon fontSize="small" /></IconButton></Tooltip>
+          </Paper>
+        </Portal>
+      )}
       <LabelsDialog open={!!labelsFor} repos={labelsFor} allLabels={allLabels} onClose={() => setLabelsFor(null)} onSave={saveLabels} />
       <AddReposDialog open={addOpen} onClose={() => setAddOpen(false)} onAdded={(d) => {
         if (!d.failed.length) setAddOpen(false);
