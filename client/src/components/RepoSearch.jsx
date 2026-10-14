@@ -6,15 +6,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import GitIcon from '@mui/icons-material/AccountTree';
 import BranchIcon from '@mui/icons-material/CallSplit';
 import { api } from '../api/client.js';
-
-const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+import { Highlight, matchesAll, norm, searchWords } from './searchText.jsx';
 
 // Coincide si todas las palabras escritas aparecen en el nombre, la ruta o la rama.
 const filterRepos = (options, { inputValue }) => {
-  const words = norm(inputValue).split(/\s+/).filter(Boolean);
+  const words = searchWords(inputValue);
   if (!words.length) return options;
   return options
-    .filter((o) => { const hay = norm(`${o.name} ${o.path} ${o.branch}`); return words.every((w) => hay.includes(w)); })
+    .filter((o) => matchesAll(words, o.name, o.path, o.branch))
     .sort((a, b) => (norm(b.name).startsWith(words[0]) ? 1 : 0) - (norm(a.name).startsWith(words[0]) ? 1 : 0));
 };
 
@@ -68,12 +67,12 @@ export default function RepoSearch() {
           <GitIcon fontSize="small" color={o.missing ? 'disabled' : 'primary'} sx={{ mt: 0.25 }} />
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" fontWeight={600} noWrap>{o.name}</Typography>
+              <Typography variant="body2" fontWeight={600} noWrap><Highlight text={o.name} words={searchWords(input)} /></Typography>
               {o.missing
                 ? <Chip size="small" color="error" variant="outlined" label="Carpeta no encontrada" />
                 : o.branch && <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={o.branch} sx={{ maxWidth: 260, height: 20, fontSize: 11 }} />}
             </Box>
-            <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11 }}>{o.path}</Typography>
+            <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11 }}><Highlight text={o.path} words={searchWords(input)} /></Typography>
           </Box>
         </Box>
       )}

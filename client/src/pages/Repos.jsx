@@ -25,6 +25,7 @@ import RepoActions, { syncRepo } from '../components/RepoActions.jsx';
 import LabelsDialog, { labelColor } from '../components/LabelsDialog.jsx';
 import { REPOS_REFRESH } from '../components/AutoFetch.jsx';
 import { useCommands } from '../components/Commands.jsx';
+import { Highlight, matchesAll, searchWords } from '../components/searchText.jsx';
 
 // Filtros rápidos por estado (excluyentes entre sí).
 const STATUS_FILTERS = [
@@ -38,6 +39,12 @@ const STATUS_FILTERS = [
 const stored = (key, fallback) => { try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; } catch { return fallback; } };
 const store = (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 
+// La búsqueda se conserva al ir al detalle de un repo y volver (y al recargar la pestaña).
+const QUERY_KEY = 'gm-repos-query';
+const storedQuery = () => { try { return sessionStorage.getItem(QUERY_KEY) || ''; } catch { return ''; } };
+// Última lista cargada: al volver a la página se muestra al instante mientras se actualiza.
+let lastData = null;
+
 function ago(iso) {
   if (!iso) return '';
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -49,11 +56,13 @@ function ago(iso) {
 }
 
 export default function Repos() {
-  const [data, setData] = useState(null);
+  const [data, setDataState] = useState(lastData);
+  const setData = useCallback((v) => setDataState((d) => (lastData = typeof v === 'function' ? v(d) : v)), []);
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [cloneOpen, setCloneOpen] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState(storedQuery);
+  useEffect(() => { try { sessionStorage.setItem(QUERY_KEY, filter); } catch { /* sin almacenamiento */ } }, [filter]);
   // Orden y filtros se recuerdan en el navegador.
   const [sort, setSort] = useState(() => stored('gm-repos-sort', { by: 'name', dir: (() => { try { return localStorage.getItem('gm-repos-order') || 'asc'; } catch { return 'asc'; } })() }));
   const [view, setView] = useState(() => stored('gm-repos-filters', { status: 'all', favorites: false, labels: [] }));
@@ -70,7 +79,7 @@ export default function Repos() {
   const load = useCallback(() => {
     setLoading(true);
     api.get('/repos').then(setData).catch((e) => notify(e.message, 'error')).finally(() => setLoading(false));
-  }, [notify]);
+  }, [notify, setData]);
   useEffect(load, [load]);
   // El fetch automático avisa al terminar: se recarga la lista para mostrar los «↓ por bajar» al día.
   useEffect(() => { window.addEventListener(REPOS_REFRESH, load); return () => window.removeEventListener(REPOS_REFRESH, load); }, [load]);
@@ -80,13 +89,16 @@ export default function Repos() {
   // Si una etiqueta filtrada ya no existe, se quita del filtro.
   useEffect(() => { if (data && view.labels.some((l) => !allLabels.includes(l))) setView((v) => ({ ...v, labels: v.labels.filter((l) => allLabels.includes(l)) })); }, [allLabels]);
 
-  // Conteos de cada filtro de estado sobre lo que ya filtran nombre, favoritos y etiquetas.
+  // Como el buscador global: cada palabra debe aparecer en el nombre, la ruta, la rama, las etiquetas
+  // o el último commit (autor y mensaje), sin distinguir mayúsculas ni tildes.
+  const words = useMemo(() => searchWords(filter), [filter]);
+  const nameHit = (r) => matchesAll(words, r.name);
+  // Conteos de cada filtro de estado sobre lo que ya filtran búsqueda, favoritos y etiquetas.
   const base = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return repos.filter((r) => (!q || r.name.toLowerCase().includes(q))
+    return repos.filter((r) => (!words.length || matchesAll(words, r.name, r.path, r.branch, r.labels || [], r.lastCommit?.author, r.lastCommit?.subject))
       && (!view.favorites || r.favorite)
       && (!view.labels.length || view.labels.some((l) => r.labels?.includes(l))));
-  }, [repos, filter, view.favorites, view.labels]);
+  }, [repos, words, view.favorites, view.labels]);
   const counts = useMemo(() => Object.fromEntries(STATUS_FILTERS.map((f) => [f.key, base.filter(f.test).length])), [base]);
 
   const shown = useMemo(() => {
@@ -94,9 +106,10 @@ export default function Repos() {
     const dir = sort.dir === 'asc' ? 1 : -1;
     const byName = (a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
     const byDate = (a, b) => (new Date(a.lastCommit?.date || 0) - new Date(b.lastCommit?.date || 0)) || byName(a, b);
-    // Los favoritos siempre van primero; dentro de cada grupo se aplica el orden elegido.
-    return base.filter(test).sort((a, b) => (!!b.favorite - !!a.favorite) || dir * (sort.by === 'date' ? byDate(a, b) : byName(a, b)));
-  }, [base, view.status, sort]);
+    // Los favoritos siempre van primero; al buscar, luego los que coinciden por nombre; después, el orden elegido.
+    const rank = (r) => (words.length && nameHit(r) ? 1 : 0);
+    return base.filter(test).sort((a, b) => (!!b.favorite - !!a.favorite) || (rank(b) - rank(a)) || dir * (sort.by === 'date' ? byDate(a, b) : byName(a, b)));
+  }, [base, view.status, sort, words]);
 
   // Descarta de la selección los repos que ya no existen en la lista.
   useEffect(() => {
@@ -179,7 +192,7 @@ export default function Repos() {
   };
 
   useCommands('repos', () => [
-    { id: 'filter', group: 'Repositorios', title: 'Filtrar por nombre', keys: '/', run: () => filterRef.current?.focus() },
+    { id: 'filter', group: 'Repositorios', title: 'Buscar en la lista', keys: '/', run: () => filterRef.current?.focus() },
     { id: 'add', group: 'Repositorios', title: 'Añadir repositorios existentes', keys: 'a', run: () => setAddOpen(true) },
     { id: 'clone', group: 'Repositorios', title: 'Clonar repositorio', keys: 'n', run: () => setCloneOpen(true) },
     { id: 'refresh', group: 'Repositorios', title: 'Actualizar la lista', keys: 'r', run: load },
@@ -205,8 +218,28 @@ export default function Repos() {
         <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>Repositorios locales</Typography>
           {repos.length > 0 && (
-            <TextField size="small" placeholder="Filtrar por nombre…  /" inputRef={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && e.target.blur()} sx={{ width: { xs: '100%', sm: 260 } }}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+            <TextField size="small" placeholder="Buscar por nombre, rama, ruta, etiqueta…" title="Varias palabras: deben coincidir todas (nombre, ruta, rama, etiquetas o autor y mensaje del último commit)" inputRef={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { if (filter) setFilter(''); else e.target.blur(); } }}
+              sx={{ width: { xs: '100%', sm: 300, lg: 360 } }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} /></InputAdornment>,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {filter ? (
+                      <>
+                        <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5, whiteSpace: 'nowrap' }}>{shown.length}</Typography>
+                        <IconButton size="small" edge="end" aria-label="Limpiar búsqueda" onClick={() => { setFilter(''); filterRef.current?.focus(); }}><CloseIcon fontSize="small" /></IconButton>
+                      </>
+                    ) : (
+                      <Box component="kbd" sx={(t) => ({
+                        fontFamily: t.typography.fontFamily, fontSize: 11, fontWeight: 700, px: 0.75, py: 0.25, borderRadius: 1,
+                        border: 1, borderColor: 'divider', bgcolor: alpha(t.palette.text.primary, 0.06), color: 'text.secondary',
+                      })}>/</Box>
+                    )}
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2.5, fontSize: 14 },
+              }} />
           )}
           <Tooltip title="Actualizar"><IconButton onClick={load}><RefreshIcon /></IconButton></Tooltip>
           <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setAddOpen(true)}>Añadir repositorios</Button>
@@ -292,27 +325,27 @@ export default function Repos() {
                           {r.favorite ? <StarIcon sx={{ fontSize: 18 }} /> : <StarOutlineIcon sx={{ fontSize: 18 }} />}
                         </IconButton>
                       </Tooltip>
-                      <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}>{r.name}</Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}><Highlight text={r.name} words={words} /></Typography>
                       {r.branch && (
                         <Tooltip title={r.branch}>
-                          <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={r.branch}
+                          <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={<Highlight text={r.branch} words={words} />}
                             sx={{ height: 20, fontSize: 11, maxWidth: { xs: '100%', xl: 560 }, minWidth: 0 }} />
                         </Tooltip>
                       )}
                       {r.labels?.map((l) => (
-                        <Chip key={l} size="small" variant="outlined" label={l}
+                        <Chip key={l} size="small" variant="outlined" label={<Highlight text={l} words={words} />}
                           onClick={(e) => { e.stopPropagation(); setView((v) => ({ ...v, labels: v.labels.includes(l) ? v.labels : [...v.labels, l] })); }}
                           sx={{ height: 20, fontSize: 11, borderColor: alpha(labelColor(l), 0.6), color: labelColor(l), bgcolor: alpha(labelColor(l), 0.08) }} />
                       ))}
                     </Stack>
-                    <Typography variant="caption" color="text.secondary" component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11.5, wordBreak: 'break-all' }}>{r.path}</Typography>
+                    <Typography variant="caption" color="text.secondary" component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11.5, wordBreak: 'break-all' }}><Highlight text={r.path} words={words} /></Typography>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap', width: 1, display: { xs: 'none', md: 'table-cell' } }}>
                     {r.lastCommit ? (
                       <Tooltip title={<>{r.lastCommit.subject}<br />{new Date(r.lastCommit.date).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' })}</>}>
                         <Box>
                           <Typography variant="body2" fontSize={13}>{ago(r.lastCommit.date)}</Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ maxWidth: 160 }}>{r.lastCommit.author}</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ maxWidth: 160 }}><Highlight text={r.lastCommit.author} words={words} /></Typography>
                         </Box>
                       </Tooltip>
                     ) : !r.missing && !r.error && <Typography variant="caption" color="text.secondary">Sin commits</Typography>}
