@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Alert, Box, Button, ButtonGroup, Checkbox, Chip, CircularProgress, Divider, Skeleton,
   FormControlLabel, IconButton, LinearProgress, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem, Paper,
@@ -59,6 +59,9 @@ const statusCache = new Map();
 export default function RepoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  // «Volver» regresa a la pantalla desde la que se abrió el repositorio (p. ej. Entornos de trabajo); por defecto, a la lista.
+  const from = useLocation().state?.from;
+  const back = from === '/workspaces' ? { to: '/workspaces', label: 'Entornos de trabajo' } : { to: '/repos', label: 'la lista de repositorios' };
   const notify = useNotify();
   // El último estado conocido se muestra al instante al volver al repo, mientras se actualiza.
   const [st, setStState] = useState(() => statusCache.get(id) || null);
@@ -231,7 +234,7 @@ export default function RepoDetail() {
     { id: 'open-folder', group: `Repositorio · ${st.name}`, title: 'Abrir carpeta en el explorador', run: () => api.post(`/repos/${id}/open`, { target: 'folder' }).catch((e) => notify(e.message, 'error')) },
     { id: 'open-code', group: `Repositorio · ${st.name}`, title: 'Abrir en VS Code', run: () => api.post(`/repos/${id}/open`, { target: 'vscode' }).catch((e) => notify(e.message, 'error')) },
     { id: 'open-term', group: `Repositorio · ${st.name}`, title: 'Abrir terminal en la carpeta', run: () => api.post(`/repos/${id}/open`, { target: 'terminal' }).catch((e) => notify(e.message, 'error')) },
-    { id: 'back', group: `Repositorio · ${st.name}`, title: 'Volver a la lista de repositorios', keys: 'backspace', icon: <BackIcon fontSize="small" />, run: () => navigate('/repos') },
+    { id: 'back', group: `Repositorio · ${st.name}`, title: `Volver a ${back.label}`, keys: 'backspace', icon: <BackIcon fontSize="small" />, run: () => navigate(back.to) },
     ...['Cambios', 'Historial', 'Ramas', 'Comparar', 'Archivos', 'Stash', 'Tags'].map((t, i) => ({ id: `tab:${i}`, group: 'Pestañas', title: `Ir a ${t}`, keys: String(i + 1), run: () => goTab(i) })),
   ] : []), [st, busy, pullPrefs, canStash, ghAccount]);
 
@@ -285,7 +288,7 @@ export default function RepoDetail() {
         {/* Barra de progreso pegada bajo la barra superior, superpuesta para no alterar la altura. */}
         {busy && <LinearProgress sx={{ position: 'absolute', top: { xs: -12, sm: -16, md: -24 }, left: { xs: -12, sm: -16, md: -24 }, right: { xs: -12, sm: -16, md: -24 }, height: 2, borderRadius: 0, bgcolor: 'transparent', zIndex: 1 }} />}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
-          <Tooltip title="Volver a la lista (Retroceso)"><IconButton onClick={() => navigate('/repos')} sx={{ ml: { xs: -1, sm: 0 } }}><BackIcon /></IconButton></Tooltip>
+          <Tooltip title={`Volver a ${back.label} (Retroceso)`}><IconButton onClick={() => navigate(back.to)} sx={{ ml: { xs: -1, sm: 0 } }}><BackIcon /></IconButton></Tooltip>
           <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 24 }, wordBreak: 'break-word', minWidth: 0 }}>{st.name}</Typography>
           <Chip label={st.branch} color="primary" variant="outlined" sx={{ maxWidth: { xs: '100%', sm: 360 } }} />
           {st.upstream ? <Typography variant="body2" color="text.secondary">→ {st.upstream} {st.ahead > 0 && `↑${st.ahead}`} {st.behind > 0 && `↓${st.behind}`}</Typography>

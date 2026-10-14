@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert, Autocomplete, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogContentText,
-  DialogTitle, Divider, FormControlLabel, IconButton, LinearProgress, Menu, MenuItem, Paper, Radio, RadioGroup, Skeleton,
+  DialogTitle, Divider, FormControlLabel, IconButton, LinearProgress, Menu, MenuItem, Paper, Radio, RadioGroup, Select, Skeleton,
   Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -349,7 +349,7 @@ function SwitchDialog({ target, onClose, onDone }) {
 }
 
 // ---------- tarjeta de un grupo ----------
-function GroupCard({ group, current, repoName, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore }) {
+function GroupCard({ group, current, repoName, onOpenRepo, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore }) {
   const [newMenu, setNewMenu] = useState(null);
   const states = group.envs.map((e) => envState(e, current));
   // Si varios entornos coinciden con las ramas actuales, se marca el último usado.
@@ -359,6 +359,14 @@ function GroupCard({ group, current, repoName, open, onToggle, onEditGroup, onEd
   })();
   const last = group.envs.findIndex((e) => e.id === group.lastEnv);
   const partial = activeIdx < 0 && last >= 0 ? { env: group.envs[last], diff: states[last].diff } : null;
+  // Entorno que muestra la tabla: el elegido en su cabecera, o el activo, o el último usado, o el primero.
+  const [viewId, setViewId] = useState(null);
+  const fallbackIdx = activeIdx >= 0 ? activeIdx : last >= 0 ? last : 0;
+  const picked = group.envs.findIndex((e) => e.id === viewId);
+  const viewedIdx = picked >= 0 ? picked : fallbackIdx;
+  const viewed = group.envs[viewedIdx];
+  // Al cambiar de entorno la tabla vuelve a mostrar el activo.
+  useEffect(() => { setViewId(null); }, [group.lastEnv]);
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
@@ -406,35 +414,48 @@ function GroupCard({ group, current, repoName, open, onToggle, onEditGroup, onEd
         </Menu>
       </Stack>
 
-      {/* Matriz repositorio × entorno: de un vistazo, qué rama usa cada repo en cada entorno. Contraída solo se ven nombre, estado y entornos. */}
+      {/* Tabla de 3 columnas: repositorio, rama actual y el entorno activo (o el que se elija en la cabecera para consultarlo).
+          Así no crece a lo ancho aunque haya muchos entornos; las ramas que no coinciden se resaltan. */}
       <Collapse in={open} unmountOnExit>
       <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
-        <Table size="small" sx={{ '& td, & th': { whiteSpace: 'nowrap' } }}>
+        <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 560, '& td, & th': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }}>
           <TableHead>
             <TableRow>
-              <TableCell>Repositorio</TableCell>
-              <TableCell>Rama actual</TableCell>
-              {group.envs.map((e, i) => (
-                <TableCell key={e.id} sx={(t) => ({ fontWeight: 700, ...(i === activeIdx && { color: 'primary.main', bgcolor: alpha(t.palette.primary.main, 0.06) }) })}>{e.name}</TableCell>
-              ))}
+              <TableCell sx={{ width: '30%' }}>Repositorio</TableCell>
+              <TableCell sx={{ width: '35%' }}>Rama actual</TableCell>
+              <TableCell sx={(t) => ({ width: '35%', fontWeight: 700, bgcolor: alpha(t.palette.primary.main, 0.06), color: viewedIdx === activeIdx ? 'primary.main' : 'text.primary' })}>
+                {!viewed ? 'Entorno' : group.envs.length === 1 ? viewed.name : (
+                  <Select variant="standard" disableUnderline size="small" value={viewed.id} onChange={(e) => setViewId(e.target.value)}
+                    sx={{ fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', '& .MuiSelect-select': { py: 0 } }}
+                    renderValue={(v) => { const i = group.envs.findIndex((e) => e.id === v); return `${group.envs[i]?.name}${i === activeIdx ? ' (activo)' : ''}`; }}>
+                    {group.envs.map((e, i) => <MenuItem key={e.id} value={e.id}>{e.name}{i === activeIdx ? ' (activo)' : ''}</MenuItem>)}
+                  </Select>
+                )}
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {group.repos.map((id) => (
-              <TableRow key={id} hover>
-                <TableCell sx={{ fontWeight: 600 }}>{repoName(id)}</TableCell>
-                <TableCell><BranchText name={current[id]} /></TableCell>
-                {group.envs.map((e, i) => {
-                  const b = e.branches[id];
-                  const off = b && current[id] !== b;
-                  return (
-                    <TableCell key={e.id} sx={(t) => ({ ...(i === activeIdx && { bgcolor: alpha(t.palette.primary.main, 0.06) }) })}>
-                      <BranchText name={b} muted={off} />
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
+            {group.repos.map((id) => {
+              const b = viewed?.branches[id];
+              const off = b && current[id] !== b;
+              return (
+                // Un clic en la fila abre el detalle del repositorio.
+                <TableRow key={id} hover onClick={() => onOpenRepo(id)}
+                  sx={{ cursor: 'pointer', '&:hover .repo-name': { color: 'primary.main', textDecoration: 'underline' } }}>
+                  <TableCell className="repo-name" sx={{ fontWeight: 600 }} title={`Abrir ${repoName(id)}`}>{repoName(id)}</TableCell>
+                  <TableCell title={current[id] || ''}><BranchText name={current[id]} /></TableCell>
+                  <TableCell sx={(t) => ({ bgcolor: alpha(t.palette.primary.main, 0.06) })}
+                    title={!b ? 'Este entorno no cambia este repositorio' : off ? `Está en ${current[id] || '?'}; este entorno usa ${b}` : b}>
+                    {!b ? <Typography component="span" variant="body2" color="text.disabled">— no cambia</Typography> : (
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                        {off && <WarningIcon color="warning" sx={{ fontSize: 16, flexShrink: 0 }} />}
+                        <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 12.5, color: off ? 'warning.main' : 'text.primary' }}>{b}</Box>
+                      </Stack>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Box>
@@ -484,6 +505,10 @@ export default function Workspaces() {
     return (id) => m.get(id) || '(quitado)';
   }, [data]);
   const groups = useMemo(() => [...(data?.groups || [])].sort((a, b) => a.name.localeCompare(b.name, 'es')), [data]);
+  const openRepo = (id) => {
+    if (data?.repos.find((r) => r.id === id)?.missing) notify('La carpeta de este repositorio ya no existe', 'warning');
+    else navigate(`/repos/${id}`, { state: { from: '/workspaces' } });
+  };
   const replaceGroup = (g) => setData({ ...data, groups: [...data.groups.filter((x) => x.id !== g.id), g] });
 
   useCommands('workspaces', () => [
@@ -530,7 +555,7 @@ export default function Workspaces() {
       )}
       <Stack spacing={2}>
         {groups.map((g) => (
-          <GroupCard key={g.id} group={g} current={data.current} repoName={repoName} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
+          <GroupCard key={g.id} group={g} current={data.current} repoName={repoName} onOpenRepo={openRepo} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
             onEditGroup={() => setGroupDlg({ group: g })}
             onEditEnv={(env) => setEnvDlg({ group: g, env })}
             onNewEnv={(seed) => setEnvDlg({ group: g, seed })}
