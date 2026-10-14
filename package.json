@@ -14,7 +14,8 @@
     "startup:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 start",
     "startup:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 stop",
     "startup:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 restart",
-    "startup:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 status"
+    "startup:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/startup/startup.ps1 status",
+    "test": "npm test -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
