@@ -17,6 +17,7 @@ import PublishIcon from '@mui/icons-material/CloudUploadOutlined';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api/client.js';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
+import { SearchToggles, makeMatcher, searchOptionKeys, useSearchOptions } from '../components/searchText.jsx';
 
 const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('es', { dateStyle: 'medium' }) : '');
 
@@ -222,6 +223,7 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   const [noFf, setNoFf] = useState(false);
   const [cleanOpen, setCleanOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [searchOpts, setSearchOpts] = useSearchOptions('branches');
 
   const load = () => api.get(`/repos/${repoId}/branches`).then(setBranches).catch(() => {});
   useEffect(() => { load(); }, [repoId]);
@@ -250,9 +252,9 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   };
   const merge = () => { const b = mergeTarget; setMergeTarget(null); act('merge', () => api.post(`/repos/${repoId}/merge`, { branch: b, noFf }), `Merge de ${b}`).then(done); };
 
-  // Every word must appear in the branch name or its last commit message (case-insensitive).
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = (b) => words.every((w) => b.name.toLowerCase().includes(w) || (b.subject || '').toLowerCase().includes(w));
+  // Cada palabra debe aparecer en el nombre de la rama o en el mensaje de su último commit; con las opciones Aa / ab / .*.
+  const matcher = makeMatcher(query, searchOpts);
+  const matches = (b) => matcher.test(b.name, b.subject || '');
 
   const section = (title, all) => {
     const list = all.filter(matches);
@@ -311,11 +313,17 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
           <Button startIcon={<CleanIcon />} onClick={() => setCleanOpen(true)}>Limpiar ramas</Button>
         </Tooltip>
         <TextField size="small" placeholder="Buscar ramas…" value={query} onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-          sx={{ ml: { sm: 'auto' }, width: { xs: '100%', sm: 300 } }}
+          onKeyDown={(e) => { if (!searchOptionKeys(e, searchOpts, setSearchOpts) && e.key === 'Escape') setQuery(''); }}
+          error={!matcher.valid} title={matcher.valid ? undefined : `Expresión regular inválida: ${matcher.error}`}
+          sx={{ ml: { sm: 'auto' }, width: { xs: '100%', sm: 380 } }}
           InputProps={{
             startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-            endAdornment: query && <InputAdornment position="end"><IconButton size="small" edge="end" aria-label="Limpiar búsqueda" onClick={() => setQuery('')}><ClearIcon fontSize="small" /></IconButton></InputAdornment>,
+            endAdornment: (
+              <InputAdornment position="end">
+                <SearchToggles value={searchOpts} onChange={setSearchOpts} size="small" />
+                {query && <IconButton size="small" edge="end" aria-label="Limpiar búsqueda" onClick={() => setQuery('')} sx={{ ml: 0.5 }}><ClearIcon fontSize="small" /></IconButton>}
+              </InputAdornment>
+            ),
           }} />
       </Stack>
       <Grid container spacing={2}>

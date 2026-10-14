@@ -16,6 +16,7 @@ import PersonIcon from '@mui/icons-material/PersonOutline';
 import FileIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ClearIcon from '@mui/icons-material/FilterAltOff';
 import { api, qs } from '../api/client.js';
+import { SearchToggles, searchOptionKeys, useSearchOptions } from '../components/searchText.jsx';
 import CommitDialog, { fmtDate } from '../components/CommitDialog.jsx';
 import { ConfirmDialog } from '../components/GitDialogs.jsx';
 import { computeGraph, laneColor } from '../graph.js';
@@ -61,6 +62,7 @@ export default function History({ repoId, branch, act, onUndo, onTag, onCompare,
   const [all, setAll] = useState(true);
   const [form, setForm] = useState(EMPTY);   // lo que escribe el usuario
   const [filters, setFilters] = useState(EMPTY); // lo que se consulta (con retardo para el texto)
+  const [qOpts, setQOpts] = useSearchOptions('history'); // Aa / ab / .* de la búsqueda en mensajes
   const [data, setData] = useState(null);   // { commits, more, filtered }
   const [loadingMore, setLoadingMore] = useState(false);
   const [files, setFiles] = useState(null);
@@ -76,12 +78,15 @@ export default function History({ repoId, branch, act, onUndo, onTag, onCompare,
   };
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const params = (skip) => qs({ limit: PAGE, skip, all: String(all), ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) });
+  const params = (skip) => qs({
+    limit: PAGE, skip, all: String(all), ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
+    ...(filters.q ? { qCase: qOpts.caseSensitive ? '1' : undefined, qWord: qOpts.wholeWord ? '1' : undefined, qRegex: qOpts.regex ? '1' : undefined } : {}),
+  });
   const load = () => {
     setData(null);
     api.get(`/repos/${repoId}/log${params(0)}`).then(setData).catch((e) => { notify(e.message, 'error'); setData({ commits: [], more: false }); });
   };
-  useEffect(load, [repoId, all, filters, version]);
+  useEffect(load, [repoId, all, filters, version, qOpts]);
 
   const more = async () => {
     setLoadingMore(true);
@@ -134,7 +139,11 @@ export default function History({ repoId, branch, act, onUndo, onTag, onCompare,
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: '2fr 1.2fr 1.6fr 0.9fr 0.9fr' } }}>
           <TextField size="small" label="Buscar en mensajes" value={form.q} onChange={(e) => set('q', e.target.value, 400)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+            onKeyDown={(e) => searchOptionKeys(e, qOpts, setQOpts)}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+              endAdornment: <InputAdornment position="end"><SearchToggles value={qOpts} onChange={setQOpts} size="small" /></InputAdornment>,
+            }} />
           <TextField size="small" label="Autor" placeholder="nombre o correo" value={form.author} onChange={(e) => set('author', e.target.value, 400)}
             InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon fontSize="small" /></InputAdornment> }} />
           <Autocomplete size="small" options={files || []} loading={!files} onOpen={loadFiles} value={form.file || null}

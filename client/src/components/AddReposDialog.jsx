@@ -8,6 +8,7 @@ import GitIcon from '@mui/icons-material/AccountTree';
 import RadarIcon from '@mui/icons-material/TravelExplore';
 import { api } from '../api/client.js';
 import PathField from './FolderPicker.jsx';
+import { SearchToggles, makeMatcher, searchOptionKeys, useSearchOptions } from './searchText.jsx';
 
 // Busca todos los repositorios git dentro de una carpeta y permite añadirlos en bloque.
 export default function AddReposDialog({ open, onClose, onAdded }) {
@@ -40,10 +41,9 @@ export default function AddReposDialog({ open, onClose, onAdded }) {
     finally { setBusy(null); }
   };
 
-  const visible = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return (scan?.repos || []).filter((r) => !q || r.relative.toLowerCase().includes(q));
-  }, [scan, filter]);
+  const [filterOpts, setFilterOpts] = useSearchOptions('add-repos');
+  const matcher = useMemo(() => makeMatcher(filter, filterOpts), [filter, filterOpts]);
+  const visible = useMemo(() => (scan?.repos || []).filter((r) => matcher.test(r.relative, r.name)), [scan, matcher]);
   const selectable = visible.filter((r) => !r.added);
   const allChecked = selectable.length > 0 && selectable.every((r) => selected.has(r.path));
   const someChecked = selectable.some((r) => selected.has(r.path));
@@ -84,7 +84,11 @@ export default function AddReposDialog({ open, onClose, onAdded }) {
               </Typography>
               {scan.repos.length > 5 && (
                 <TextField size="small" placeholder="Filtrar…" value={filter} onChange={(e) => setFilter(e.target.value)}
-                  InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} />
+                  onKeyDown={(e) => searchOptionKeys(e, filterOpts, setFilterOpts)} error={!matcher.valid}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                    endAdornment: <InputAdornment position="end"><SearchToggles value={filterOpts} onChange={setFilterOpts} size="small" /></InputAdornment>,
+                  }} />
               )}
             </Stack>
             {scan.repos.length === 0 ? (

@@ -696,6 +696,8 @@ const parseLog = (stdout) => stdout.split('\x1e').map((x) => x.trim()).filter(Bo
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Historial con filtros: q (mensaje), author, file, since/until (AAAA-MM-DD), all (todas las ramas) y paginación (skip).
+// Opciones de la búsqueda en mensajes, como en VS Code: qCase (distinguir mayúsculas), qWord (palabra completa)
+// y qRegex (expresión regular). Git aplica el tipo de patrón y -i también al autor.
 // Sin filtros se usa orden topológico para que el gráfico de ramas sea coherente.
 r.get('/:id/log', async (req, res) => {
   const repo = getRepo(req.params.id);
@@ -706,8 +708,15 @@ r.get('/:id/log', async (req, res) => {
   const filtered = !!(q || author || file || since || until);
   args.push(filtered ? '--date-order' : '--topo-order');
   if (req.query.all === 'true') args.push('--all');
-  if (q) args.push('-i', '--fixed-strings', `--grep=${q}`);
-  if (author) args.push('-i', '--fixed-strings', `--author=${author}`);
+  const ere = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const useEre = !!q && (req.query.qWord === '1' || req.query.qRegex === '1');
+  if ((q && req.query.qCase !== '1') || (!q && author)) args.push('-i');
+  args.push(useEre ? '-E' : '--fixed-strings');
+  if (q) {
+    const pattern = req.query.qRegex === '1' ? q : (useEre ? ere(q) : q);
+    args.push(`--grep=${req.query.qWord === '1' ? `\\b(${pattern})\\b` : pattern}`);
+  }
+  if (author) args.push(`--author=${useEre ? ere(author) : author}`);
   if (since) { if (!DATE_RE.test(since)) throw bad('Fecha inválida'); args.push(`--since=${since} 00:00`); }
   if (until) { if (!DATE_RE.test(until)) throw bad('Fecha inválida'); args.push(`--until=${until} 23:59:59`); }
   if (file) { safePaths(repo, file); args.push('--', file); }

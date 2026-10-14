@@ -26,7 +26,7 @@ import RepoActions, { syncRepo } from '../components/RepoActions.jsx';
 import LabelsDialog, { labelColor } from '../components/LabelsDialog.jsx';
 import { REPOS_REFRESH } from '../components/AutoFetch.jsx';
 import { useCommands } from '../components/Commands.jsx';
-import { Highlight, matchesAll, searchWords } from '../components/searchText.jsx';
+import { Highlight, SearchToggles, makeMatcher, searchOptionKeys, useSearchOptions } from '../components/searchText.jsx';
 
 // Filtros rápidos por estado (excluyentes entre sí).
 const STATUS_FILTERS = [
@@ -103,15 +103,16 @@ export default function Repos() {
   useEffect(() => { if (data && view.labels.some((l) => !allLabels.includes(l))) setView((v) => ({ ...v, labels: v.labels.filter((l) => allLabels.includes(l)) })); }, [allLabels]);
 
   // Como el buscador global: cada palabra debe aparecer en el nombre, la ruta, la rama, las etiquetas
-  // o el último commit (autor y mensaje), sin distinguir mayúsculas ni tildes.
-  const words = useMemo(() => searchWords(filter), [filter]);
-  const nameHit = (r) => matchesAll(words, r.name);
+  // o el último commit (autor y mensaje), sin distinguir mayúsculas ni tildes; con las opciones Aa / ab / .* como en VS Code.
+  const [searchOpts, setSearchOpts] = useSearchOptions('repos');
+  const matcher = useMemo(() => makeMatcher(filter, searchOpts), [filter, searchOpts]);
+  const nameHit = (r) => !matcher.empty && matcher.test(r.name);
   // Conteos de cada filtro de estado sobre lo que ya filtran búsqueda, favoritos y etiquetas.
   const base = useMemo(() => {
-    return repos.filter((r) => (!words.length || matchesAll(words, r.name, r.path, r.branch, r.labels || [], r.lastCommit?.author, r.lastCommit?.subject))
+    return repos.filter((r) => (matcher.empty || matcher.test(r.name, r.path, r.branch, r.labels || [], r.lastCommit?.author, r.lastCommit?.subject))
       && (!view.favorites || r.favorite)
       && (!view.labels.length || view.labels.some((l) => r.labels?.includes(l))));
-  }, [repos, words, view.favorites, view.labels]);
+  }, [repos, matcher, view.favorites, view.labels]);
   const counts = useMemo(() => Object.fromEntries(STATUS_FILTERS.map((f) => [f.key, base.filter(f.test).length])), [base]);
 
   const shown = useMemo(() => {
@@ -120,9 +121,9 @@ export default function Repos() {
     const byName = (a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
     const byDate = (a, b) => (new Date(a.lastCommit?.date || 0) - new Date(b.lastCommit?.date || 0)) || byName(a, b);
     // Los favoritos siempre van primero; al buscar, luego los que coinciden por nombre; después, el orden elegido.
-    const rank = (r) => (words.length && nameHit(r) ? 1 : 0);
+    const rank = (r) => (nameHit(r) ? 1 : 0);
     return base.filter(test).sort((a, b) => (!!b.favorite - !!a.favorite) || (rank(b) - rank(a)) || dir * (sort.by === 'date' ? byDate(a, b) : byName(a, b)));
-  }, [base, view.status, sort, words]);
+  }, [base, view.status, sort, matcher]);
 
   // Descarta de la selección los repos que ya no existen en la lista.
   useEffect(() => {
@@ -231,13 +232,17 @@ export default function Repos() {
         <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>Repositorios locales</Typography>
           {repos.length > 0 && (
-            <TextField size="small" placeholder="Buscar por nombre, rama, ruta, etiqueta…" title="Varias palabras: deben coincidir todas (nombre, ruta, rama, etiquetas o autor y mensaje del último commit)" inputRef={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Escape') { if (filter) setFilter(''); else e.target.blur(); } }}
-              sx={{ width: { xs: '100%', sm: 300, lg: 360 } }}
+            <TextField size="small" placeholder="Buscar por nombre, rama, ruta, etiqueta…" inputRef={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)}
+              onKeyDown={(e) => { if (searchOptionKeys(e, searchOpts, setSearchOpts)) return; if (e.key === 'Escape') { if (filter) setFilter(''); else e.target.blur(); } }}
+              error={!matcher.valid}
+                title={matcher.valid ? 'Varias palabras: deben coincidir todas (nombre, ruta, rama, etiquetas o autor y mensaje del último commit). Aa / ab / .*: mayúsculas, palabra completa, expresión regular' : `Expresión regular inválida: ${matcher.error}`}
+              sx={{ width: { xs: '100%', sm: 380, lg: 440 } }}
               InputProps={{
                 startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} /></InputAdornment>,
                 endAdornment: (
                   <InputAdornment position="end">
+                    <SearchToggles value={searchOpts} onChange={setSearchOpts} size="small" />
+                    <Box sx={{ width: 6 }} />
                     {filter ? (
                       <>
                         <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5, whiteSpace: 'nowrap' }}>{shown.length}</Typography>
@@ -311,13 +316,13 @@ export default function Repos() {
                   <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}><Checkbox size="small" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></TableCell>
                   <TableCell sx={{ maxWidth: 0 }}>
                     <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" sx={{ minWidth: 0, columnGap: 1, rowGap: 0.5 }}>
-                      <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}><Highlight text={r.name} words={words} /></Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ flexShrink: 0 }}><Highlight text={r.name} matcher={matcher} /></Typography>
                       {/* La estrella va a la derecha de la rama (no delante del nombre) para que el nombre quede alineado con la ruta;
                           rama y estrella van juntas para que la estrella no quede sola en otra línea. */}
                       <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, maxWidth: '100%' }}>
                         {r.branch && (
                           <Tooltip title={r.branch}>
-                            <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={<Highlight text={r.branch} words={words} />}
+                            <Chip size="small" variant="outlined" color="primary" icon={<BranchIcon sx={{ fontSize: '14px !important' }} />} label={<Highlight text={r.branch} matcher={matcher} />}
                               sx={{ height: 20, fontSize: 11, maxWidth: { xs: '100%', xl: 560 }, minWidth: 0 }} />
                           </Tooltip>
                         )}
@@ -329,19 +334,19 @@ export default function Repos() {
                         </Tooltip>
                       </Stack>
                       {r.labels?.map((l) => (
-                        <Chip key={l} size="small" variant="outlined" label={<Highlight text={l} words={words} />}
+                        <Chip key={l} size="small" variant="outlined" label={<Highlight text={l} matcher={matcher} />}
                           onClick={(e) => { e.stopPropagation(); setView((v) => ({ ...v, labels: v.labels.includes(l) ? v.labels : [...v.labels, l] })); }}
                           sx={{ height: 20, fontSize: 11, borderColor: alpha(labelColor(l), 0.6), color: labelColor(l), bgcolor: alpha(labelColor(l), 0.08) }} />
                       ))}
                     </Stack>
-                    <Typography variant="caption" color="text.secondary" component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11.5, wordBreak: 'break-all' }}><Highlight text={r.path} words={words} /></Typography>
+                    <Typography variant="caption" color="text.secondary" component="div" sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 11.5, wordBreak: 'break-all' }}><Highlight text={r.path} matcher={matcher} /></Typography>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap', width: 1, display: { xs: 'none', md: 'table-cell' } }}>
                     {r.lastCommit ? (
                       <Tooltip title={<>{r.lastCommit.subject}<br />{new Date(r.lastCommit.date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</>}>
                         <Box>
                           <Typography variant="body2" fontSize={13}>{ago(r.lastCommit.date)}</Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ maxWidth: 160 }}><Highlight text={r.lastCommit.author} words={words} /></Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap component="div" sx={{ maxWidth: 160 }}><Highlight text={r.lastCommit.author} matcher={matcher} /></Typography>
                         </Box>
                       </Tooltip>
                     ) : !r.missing && !r.error && <Typography variant="caption" color="text.secondary">Sin commits</Typography>}
