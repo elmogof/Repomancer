@@ -260,10 +260,10 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
     const list = all.filter(matches);
     return (
     <Paper variant="outlined">
-      <List dense subheader={<ListSubheader>{title} ({words.length ? `${list.length} de ${all.length}` : all.length})</ListSubheader>}>
+      <List dense subheader={<ListSubheader>{title} ({!matcher.empty ? `${list.length} de ${all.length}` : all.length})</ListSubheader>}>
         {list.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
-            {words.length ? 'Ninguna rama coincide con la búsqueda.' : 'No hay ramas.'}
+            {!matcher.empty ? 'Ninguna rama coincide con la búsqueda.' : 'No hay ramas.'}
           </Typography>
         )}
         {list.map((b) => (
