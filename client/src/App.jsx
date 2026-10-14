@@ -19,6 +19,7 @@ import ExpandIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import CommandIcon from '@mui/icons-material/KeyboardCommandKey';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import SearchCodeIcon from '@mui/icons-material/ManageSearch';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { api } from './api/client.js';
 import Login from './pages/Login.jsx';
 import RepoSearch from './components/RepoSearch.jsx';
@@ -34,6 +35,7 @@ import OpLog from './pages/OpLog.jsx';
 import Accounts from './pages/Accounts.jsx';
 import Workspaces from './pages/Workspaces.jsx';
 import Search from './pages/Search.jsx';
+import Settings from './pages/Settings.jsx';
 
 const DRAWER = 250;
 const DRAWER_MINI = 68;
@@ -57,6 +59,7 @@ const nav = [
   { to: '/pull-requests', label: 'Pull requests (GitHub)', icon: <GitHubIcon /> },
   { to: '/oplog', label: 'Registro de operaciones', icon: <LogIcon /> },
   { to: '/accounts', label: 'Cuentas', icon: <AccountsIcon /> },
+  { to: '/settings', label: 'Configuración', icon: <SettingsIcon /> },
 ];
 
 // Comandos globales de la paleta y sus atajos.
@@ -158,6 +161,7 @@ export default function App({ mode, onToggleMode }) {
               {!auth.user && <MenuItem onClick={() => { setMenu(null); navigate('/connect/gitlab'); }}>Conectar GitLab</MenuItem>}
               {!auth.github && <MenuItem onClick={() => { setMenu(null); navigate('/connect/github'); }}>Conectar GitHub</MenuItem>}
               <MenuItem onClick={() => { setMenu(null); navigate('/accounts'); }}>Cuentas</MenuItem>
+              <MenuItem onClick={() => { setMenu(null); navigate('/settings'); }}>Configuración</MenuItem>
               <MenuItem onClick={() => { setMenu(null); onToggleMode(); }} sx={{ display: { sm: 'none' } }}>Cambiar tema</MenuItem>
               <MenuItem onClick={logout}>Cerrar sesión</MenuItem>
             </Menu>
@@ -188,6 +192,7 @@ export default function App({ mode, onToggleMode }) {
             <Route path="/repos/:id" element={<RepoDetailKeyed />} />
             <Route path="/workspaces" element={<Workspaces />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/settings" element={<Settings mode={mode} onToggleMode={onToggleMode} />} />
             <Route path="/projects" element={needsGitlab(<Projects />)} />
             <Route path="/merge-requests" element={needsGitlab(<MergeRequests />)} />
             <Route path="/projects/:pid/merge-requests/:iid" element={needsGitlab(<MergeRequestDetail />)} />

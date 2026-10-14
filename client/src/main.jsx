@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import App from './App.jsx';
 import { NotifyProvider } from './components/Notify.jsx';
+import { ConfirmProvider } from './components/Confirm.jsx';
 import buildTheme from './theme.js';
 
 function Root() {
@@ -14,9 +15,11 @@ function Root() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <NotifyProvider>
-        <BrowserRouter>
-          <App mode={mode} onToggleMode={toggle} />
-        </BrowserRouter>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <App mode={mode} onToggleMode={toggle} />
+          </BrowserRouter>
+        </ConfirmProvider>
       </NotifyProvider>
     </ThemeProvider>
   );

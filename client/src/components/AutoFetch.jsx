@@ -15,6 +15,8 @@ export const AUTOFETCH_RUN = 'gm-autofetch-run'; // lo lanza la paleta de comand
 let latest = null; // último estado conocido, compartido entre el vigilante y el botón
 
 const publish = (s) => { latest = s; window.dispatchEvent(new CustomEvent(EVENT, { detail: s })); };
+// Para la pantalla de Configuración: guarda los ajustes y actualiza el botón de la barra superior.
+export async function saveAutoFetch(body) { const s = await api.put('/auto-fetch', body); publish({ ...latest, ...s, events: [] }); return s; }
 
 function relTime(iso) {
   if (!iso) return '';

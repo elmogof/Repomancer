@@ -169,8 +169,9 @@ export default function RepoDetail() {
     setConfirm({ title: 'Descartar líneas', confirm: 'Descartar', color: 'error', body: 'Las líneas elegidas volverán a su versión anterior en el archivo. No se puede deshacer.', run: go });
   };
 
-  const commit = async (andPush) => {
-    const r = await act('commit', () => api.post(`/repos/${id}/commit`, { message, amend }), 'Commit creado');
+  // msg: el mensaje final de la caja de commit (con el ticket de la rama añadido si corresponde).
+  const commit = async (andPush, msg = message) => {
+    const r = await act('commit', () => api.post(`/repos/${id}/commit`, { message: msg, amend }), 'Commit creado');
     if (r) {
       setMessage(''); setAmend(false); setSelected(null);
       if (andPush) await act('push', () => api.post(`/repos/${id}/push`), 'Push completado');
@@ -385,7 +386,7 @@ export default function RepoDetail() {
         {tab === 0 && (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: 2, height: { md: '100%' } }}>
             <Stack spacing={2} sx={{ minHeight: 0, overflow: { md: 'auto' }, display: mobile && (conflictSel || commitSel || selected) ? 'none' : 'flex' }}>
-              <CommitBox repoId={id} message={message} setMessage={setMessage} amend={amend} setAmend={setAmend} staged={staged.length} busy={busy}
+              <CommitBox repoId={id} branch={st.branch} message={message} setMessage={setMessage} amend={amend} setAmend={setAmend} staged={staged.length} busy={busy}
                 onCommit={commit} onStash={() => setStashOpen(true)} onUndo={() => undoCommit()} canStash={canStash} canUndo={!st.operation}
                 notify={notify} inputRef={messageRef} />
               {outgoing && outgoing.commits.length > 0 && (

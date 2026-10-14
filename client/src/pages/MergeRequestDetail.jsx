@@ -9,6 +9,7 @@ import BackIcon from '@mui/icons-material/ArrowBack';
 import OpenIcon from '@mui/icons-material/OpenInNew';
 import { api } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
+import { useConfirm } from '../components/Confirm.jsx';
 import DiffView from '../components/DiffView.jsx';
 
 // Último detalle cargado de cada MR: al volver se muestra al instante mientras se actualiza.
@@ -18,6 +19,7 @@ export default function MergeRequestDetail() {
   const { pid, iid } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
+  const confirm = useConfirm();
   const [mr, setMrState] = useState(() => mrCache.get(`${pid}/${iid}`) || null);
   const setMr = (m) => { mrCache.set(`${pid}/${iid}`, m); setMrState(m); };
   const [tab, setTab] = useState(0);
@@ -72,9 +74,9 @@ export default function MergeRequestDetail() {
             <FormControlLabel control={<Checkbox checked={removeSrc} onChange={(e) => setRemoveSrc(e.target.checked)} />} label="Borrar rama origen" />
             <Box sx={{ flexGrow: 1 }} />
             <Button disabled={busy} onClick={() => run(() => api.post(`${base}/approve`), 'Aprobado')}>Aprobar</Button>
-            <Button disabled={busy} color="error" onClick={() => confirm('¿Cerrar este merge request?') && run(() => api.put(`${base}/close`), 'Merge request cerrado')}>Cerrar</Button>
+            <Button disabled={busy} color="error" onClick={async () => (await confirm({ title: '¿Cerrar este merge request?', body: 'Se cierra sin fusionar. Podrás reabrirlo desde GitLab.', confirm: 'Cerrar', color: 'error' })) && run(() => api.put(`${base}/close`), 'Merge request cerrado')}>Cerrar</Button>
             <Button disabled={busy || mr.has_conflicts || mr.draft} variant="contained" color="success"
-              onClick={() => confirm(`¿Fusionar ${mr.source_branch} en ${mr.target_branch}?`) && run(() => api.put(`${base}/merge`, { squash, should_remove_source_branch: removeSrc }), 'Merge request fusionado')}>
+              onClick={async () => (await confirm({ title: '¿Fusionar este merge request?', body: `${mr.source_branch} → ${mr.target_branch}`, confirm: 'Fusionar' })) && run(() => api.put(`${base}/merge`, { squash, should_remove_source_branch: removeSrc }), 'Merge request fusionado')}>
               Fusionar
             </Button>
           </Stack>

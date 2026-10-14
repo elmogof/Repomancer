@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { load, update } from '../config.js';
+import { CONFIG_DIR, load, update } from '../config.js';
 import * as git from '../git.js';
 import { api } from '../gitlab.js';
 import { currentBranch, findRepos } from '../scan.js';
@@ -11,6 +11,7 @@ import { lastFetch, markFetched } from '../autofetch.js';
 import { accountForHost, gitlabInstances } from '../accounts.js';
 import { gh, ownerRepo, pickPull } from '../github.js';
 import { suggest } from '../commitmsg.js';
+import * as commitSettings from '../commitSettings.js';
 
 const r = Router();
 
@@ -164,10 +165,17 @@ r.post('/clone', async (req, res) => {
   res.json(addRepo(dest, gitlabProjectId ? { gitlabProjectId, ...(instance ? { gitlabInstance: instance } : {}) } : {}));
 });
 
+// Ajustes generales del servidor (pantalla Configuración): carpeta de clonado y dónde se guardan los datos.
+r.get('/settings', (req, res) => res.json({ defaultCloneDir: load().defaultCloneDir, configDir: CONFIG_DIR }));
+
+// Convenciones de commit: generales y por repositorio (own = null usa las generales).
+r.get('/commit-settings', (req, res) => res.json({ global: commitSettings.globalSettings(), defaults: commitSettings.DEFAULTS }));
+r.put('/commit-settings', (req, res) => res.json({ global: commitSettings.saveGlobal(req.body?.global || {}) }));
+
 r.put('/settings', (req, res) => {
   const { defaultCloneDir } = req.body || {};
   if (defaultCloneDir) update((c) => { c.defaultCloneDir = path.resolve(defaultCloneDir); });
-  res.json({ defaultCloneDir: load().defaultCloneDir });
+  res.json({ defaultCloneDir: load().defaultCloneDir, configDir: CONFIG_DIR });
 });
 
 r.post('/remove-many', (req, res) => {
@@ -895,6 +903,9 @@ r.get('/:id/commit/:hash', async (req, res) => {
 });
 
 // ---------- mensaje de commit sugerido (local, sin servicios externos) ----------
+r.get('/:id/commit-settings', (req, res) => { getRepo(req.params.id); res.json(commitSettings.forRepo(req.params.id)); });
+r.put('/:id/commit-settings', (req, res) => { getRepo(req.params.id); res.json(commitSettings.saveRepo(req.params.id, req.body?.own || null)); });
+
 r.post('/:id/suggest-message', async (req, res) => {
   const repo = getRepo(req.params.id);
   res.json(await suggest(repo.path));
