@@ -155,8 +155,8 @@ Also in the repository detail:
 ## Installation
 
 ```bash
-git clone https://github.com/elmogof/Git-Manager-Local-Remote.git repomancer
-cd repomancer
+git clone https://github.com/elmogof/Repomancer.git
+cd Repomancer
 npm install
 ```
 
@@ -249,7 +249,7 @@ You can also set them with the environment variables `REPOMANCER_GITLAB_CLIENT_I
 **Creating the github.com app** (once, by the maintainer):
 
 1. Open **Settings → Developer settings → OAuth Apps → New OAuth App** (<https://github.com/settings/applications/new>).
-2. **Application name:** `Repomancer`. **Homepage URL:** your repository URL, for example `https://github.com/elmogof/Git-Manager-Local-Remote`.
+2. **Application name:** `Repomancer`. **Homepage URL:** your repository URL, for example `https://github.com/elmogof/Repomancer`.
 3. **Authorization callback URL:** `http://localhost:4000`. It isn't used by the device flow, but GitHub requires one.
 4. Click **Register application**, check **Enable Device Flow**, and click **Update application**.
 5. Copy the **Client ID** into `oauth-apps.json`. Don't generate a client secret; it isn't needed.
