@@ -1,14 +1,15 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
-// Paleta y tipografía inspiradas en el sitio de Material UI (mui.com).
-export const blue = {
-  50: '#F0F7FF', 100: '#CEE5FD', 200: '#9CCCFC', 300: '#55A6F6', 400: '#3399FF',
-  500: '#007FFF', 600: '#0072E5', 700: '#0059B2', 800: '#004C99', 900: '#003A75',
+// Colores del logo de Repomancer: violeta del sombrero (brand) y azul noche del fondo (primaryDark).
+export const brand = {
+  50: '#F3F2FF', 100: '#E6E3FE', 200: '#CCC7FC', 300: '#ABA3F9', 400: '#8F86F7',
+  500: '#6C61EC', 600: '#5A4FE6', 700: '#4A3FCC', 800: '#3B32A3', 900: '#2C2678',
 };
 export const primaryDark = {
-  50: '#EAEDF1', 100: '#DAE0E7', 200: '#ACBAC8', 300: '#7B91A7', 400: '#4B5E71',
-  500: '#3B4A59', 600: '#2F3A46', 700: '#1F262E', 800: '#141A1F', 900: '#0C1017',
+  50: '#ECEEF6', 100: '#D9DDEC', 200: '#B0B7D3', 300: '#8089B0', 400: '#545E88',
+  500: '#3E476E', 600: '#2E3659', 700: '#212846', 800: '#182038', 900: '#10162B',
 };
+const night = '#0A0E1C';
 export const grey = {
   50: '#F3F6F9', 100: '#E5EAF2', 200: '#DAE2ED', 300: '#C7D0DD', 400: '#B0B8C4',
   500: '#9DA8B7', 600: '#6B7A90', 700: '#434D5B', 800: '#303740', 900: '#1C2025',
@@ -27,21 +28,21 @@ export default function buildTheme(mode) {
   const paper = dark ? alpha(primaryDark[800], 0.55) : alpha('#fff', 0.75);
   const glass = dark ? alpha(primaryDark[900], 0.72) : alpha('#fff', 0.8);
   const hover = dark ? alpha(primaryDark[600], 0.35) : alpha(grey[100], 0.7);
-  const primaryMain = dark ? blue[400] : blue[500];
+  const primaryMain = dark ? brand[400] : brand[600];
 
   return createTheme({
     palette: {
       mode,
-      primary: { ...blue, main: primaryMain, light: blue[300], dark: blue[700], contrastText: '#fff' },
+      primary: { ...brand, main: primaryMain, light: brand[300], dark: brand[700], contrastText: '#fff' },
       secondary: { main: dark ? primaryDark[300] : grey[700] },
       success: { ...success, main: dark ? success.darkMain : success.main },
       error: { ...error, main: dark ? error.darkMain : error.main },
       warning: { ...warning, main: dark ? warning.darkMain : warning.main },
-      info: { main: dark ? blue[300] : blue[600] },
+      info: { main: dark ? brand[300] : brand[600] },
       grey,
       divider,
       background: dark
-        ? { default: '#0B0D0E', paper: primaryDark[900] }
+        ? { default: night, paper: primaryDark[900] }
         : { default: '#fff', paper: '#fff' },
       text: dark
         ? { primary: '#fff', secondary: grey[400], tertiary: grey[500] }
@@ -74,10 +75,10 @@ export default function buildTheme(mode) {
           '.gm-enter': { animation: 'gm-enter .22s cubic-bezier(.2,.7,.3,1) both' },
           '@media (prefers-reduced-motion: reduce)': { '.gm-enter': { animation: 'none' } },
           body: {
-            backgroundColor: dark ? '#0B0D0E' : '#fff',
+            backgroundColor: dark ? night : '#fff',
             backgroundImage: dark
-              ? `radial-gradient(1200px 600px at 85% -10%, ${alpha(blue[700], 0.22)}, transparent 60%), radial-gradient(900px 500px at 0% 110%, ${alpha(primaryDark[600], 0.35)}, transparent 60%)`
-              : `radial-gradient(1200px 600px at 85% -10%, ${alpha(blue[100], 0.6)}, transparent 60%)`,
+              ? `radial-gradient(1200px 600px at 85% -10%, ${alpha(brand[700], 0.22)}, transparent 60%), radial-gradient(900px 500px at 0% 110%, ${alpha(primaryDark[600], 0.35)}, transparent 60%)`
+              : `radial-gradient(1200px 600px at 85% -10%, ${alpha(brand[100], 0.6)}, transparent 60%)`,
             backgroundAttachment: 'fixed',
             minHeight: '100vh',
           },
@@ -87,11 +88,11 @@ export default function buildTheme(mode) {
             backgroundColor: dark ? alpha(primaryDark[600], 0.5) : grey[50],
             border: `1px solid ${divider}`,
           },
-          '::selection': { backgroundColor: alpha(blue[500], 0.35) },
+          '::selection': { backgroundColor: alpha(brand[500], 0.35) },
           '*::-webkit-scrollbar': { width: 10, height: 10 },
           '*::-webkit-scrollbar-thumb': {
             backgroundColor: dark ? primaryDark[600] : grey[300], borderRadius: 8,
-            border: `2px solid ${dark ? '#0B0D0E' : '#fff'}`,
+            border: `2px solid ${dark ? night : '#fff'}`,
           },
           '*::-webkit-scrollbar-track': { background: 'transparent' },
         },
@@ -202,11 +203,11 @@ export default function buildTheme(mode) {
           root: { borderRadius: 10 },
           containedPrimary: {
             color: '#fff',
-            backgroundImage: `linear-gradient(180deg, ${blue[400]} 0%, ${blue[600]} 100%)`,
-            border: `1px solid ${blue[500]}`,
-            boxShadow: `inset 0 1px 0 ${alpha(blue[200], 0.4)}, 0 2px 8px ${alpha(blue[600], 0.3)}`,
-            textShadow: `0 1px 1px ${alpha(blue[900], 0.4)}`,
-            '&:hover': { backgroundImage: `linear-gradient(180deg, ${blue[500]} 0%, ${blue[700]} 100%)` },
+            backgroundImage: `linear-gradient(180deg, ${brand[400]} 0%, ${brand[600]} 100%)`,
+            border: `1px solid ${brand[500]}`,
+            boxShadow: `inset 0 1px 0 ${alpha(brand[200], 0.4)}, 0 2px 8px ${alpha(brand[600], 0.3)}`,
+            textShadow: `0 1px 1px ${alpha(brand[900], 0.4)}`,
+            '&:hover': { backgroundImage: `linear-gradient(180deg, ${brand[500]} 0%, ${brand[700]} 100%)` },
             '&.Mui-disabled': { backgroundImage: 'none', border: `1px solid ${divider}`, boxShadow: 'none', textShadow: 'none' },
           },
           outlined: {
@@ -240,14 +241,14 @@ export default function buildTheme(mode) {
             borderColor: dark ? primaryDark[600] : grey[200],
           },
           outlinedPrimary: {
-            backgroundColor: alpha(blue[500], dark ? 0.15 : 0.08),
-            borderColor: alpha(blue[400], 0.5),
-            color: dark ? blue[200] : blue[700],
+            backgroundColor: alpha(brand[500], dark ? 0.15 : 0.08),
+            borderColor: alpha(brand[400], 0.5),
+            color: dark ? brand[200] : brand[700],
           },
           outlinedSuccess: { backgroundColor: alpha(success.main, 0.12), borderColor: alpha(success.main, 0.45) },
           outlinedWarning: { backgroundColor: alpha(warning.main, 0.12), borderColor: alpha(warning.main, 0.45) },
           outlinedError: { backgroundColor: alpha(error.main, 0.12), borderColor: alpha(error.main, 0.45) },
-          outlinedInfo: { backgroundColor: alpha(blue[500], 0.12), borderColor: alpha(blue[400], 0.45) },
+          outlinedInfo: { backgroundColor: alpha(brand[500], 0.12), borderColor: alpha(brand[400], 0.45) },
         },
       },
       MuiListItemButton: {
@@ -257,8 +258,8 @@ export default function buildTheme(mode) {
             '&:hover': { backgroundColor: hover },
             '&.Mui-selected': {
               backgroundColor: alpha(primaryMain, dark ? 0.12 : 0.08),
-              color: dark ? blue[300] : blue[600],
-              '& .MuiListItemIcon-root': { color: dark ? blue[300] : blue[600] },
+              color: dark ? brand[300] : brand[600],
+              '& .MuiListItemIcon-root': { color: dark ? brand[300] : brand[600] },
               '&:hover': { backgroundColor: alpha(primaryMain, dark ? 0.18 : 0.12) },
             },
           },
@@ -281,8 +282,8 @@ export default function buildTheme(mode) {
             backgroundColor: dark ? alpha(primaryDark[800], 0.5) : alpha('#fff', 0.7),
             '& .MuiOutlinedInput-notchedOutline': { borderColor: dark ? primaryDark[600] : grey[200] },
             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: dark ? primaryDark[400] : grey[300] },
-            '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(blue[500], dark ? 0.3 : 0.2)}` },
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: blue[500], borderWidth: 1 },
+            '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(brand[500], dark ? 0.3 : 0.2)}` },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: brand[500], borderWidth: 1 },
             // Con etiqueta flotante, el anillo de foco (una sombra sin hueco) cruzaría la etiqueta:
             // en esos campos se resalta el borde, que sí respeta el hueco de la etiqueta.
             '.MuiInputLabel-root + &.Mui-focused': { boxShadow: 'none' },
@@ -310,7 +311,7 @@ export default function buildTheme(mode) {
           standardError: { backgroundColor: alpha(error.main, dark ? 0.12 : 0.06), borderColor: alpha(error.main, 0.35) },
           standardSuccess: { backgroundColor: alpha(success.main, dark ? 0.12 : 0.06), borderColor: alpha(success.main, 0.35) },
           standardWarning: { backgroundColor: alpha(warning.main, dark ? 0.12 : 0.06), borderColor: alpha(warning.main, 0.35) },
-          standardInfo: { backgroundColor: alpha(blue[500], dark ? 0.12 : 0.06), borderColor: alpha(blue[400], 0.35) },
+          standardInfo: { backgroundColor: alpha(brand[500], dark ? 0.12 : 0.06), borderColor: alpha(brand[400], 0.35) },
         },
       },
       MuiSnackbarContent: {
@@ -323,13 +324,13 @@ export default function buildTheme(mode) {
       },
       MuiLinearProgress: {
         styleOverrides: {
-          root: { borderRadius: 4, backgroundColor: alpha(blue[500], 0.15) },
+          root: { borderRadius: 4, backgroundColor: alpha(brand[500], 0.15) },
           bar: { borderRadius: 4 },
         },
       },
       MuiLink: {
         defaultProps: { underline: 'hover' },
-        styleOverrides: { root: { fontWeight: 500, color: dark ? blue[300] : blue[600] } },
+        styleOverrides: { root: { fontWeight: 500, color: dark ? brand[300] : brand[600] } },
       },
       MuiAvatar: {
         styleOverrides: { root: { border: `2px solid ${dark ? primaryDark[600] : grey[200]}` } },

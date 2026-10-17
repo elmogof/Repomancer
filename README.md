@@ -142,6 +142,7 @@ Also in the repository detail:
 - **Auto-fetch** runs in the background on all repositories (every 10 minutes by default; configurable or can be turned off) so the ↓ counts stay current.
 - The **operation log** records every Git operation (fetch, pull, push, commit, merge, branch deletion and so on) with its result and output.
 - A **Configuración** (settings) page gathers the theme, clone folder, pull mode, auto-fetch, the default work-environment switch options and the commit conventions, and shows where the app keeps its data.
+- Light and dark themes in the colors of the Repomancer logo (violet and night blue), a collapsible sidebar, a mobile-friendly layout, smooth screen transitions and loading placeholders.
 
 ## Requirements
 
