@@ -483,13 +483,16 @@ function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, op
   const missingIn = (env) => group.repos.filter((id) => gone(env, id));
 
   return (
-    <Paper ref={cardRef} variant="outlined" {...dropTarget} sx={{ p: { xs: 1.5, sm: 2 }, pl: { xs: 0.5, sm: 1 }, transition: 'opacity .15s', ...(dragging && { opacity: 0.45, borderStyle: 'dashed', borderColor: 'primary.main' }) }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+    <Paper ref={cardRef} variant="outlined" {...dropTarget}
+      sx={{ p: { xs: 1, sm: 1.25 }, pl: { xs: 0.5, sm: 0.75 }, transition: 'opacity .15s', '&:hover .gm-actions, &:focus-within .gm-actions': { opacity: 1 }, ...(dragging && { opacity: 0.45, borderStyle: 'dashed', borderColor: 'primary.main' }) }}>
+      {/* Una sola fila: nombre y estado a la izquierda, entornos en el centro y acciones a la derecha
+          (en pantallas estrechas los entornos bajan a su propia línea). */}
+      <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ columnGap: 0.75, rowGap: 1 }}>
         {/* Asa para arrastrar el grupo (o moverlo con las flechas arriba y abajo cuando tiene el foco). */}
         <Tooltip title="Arrastra para ordenar (o usa ↑ ↓)">
           <Box {...handle} tabIndex={0} role="button" aria-label={`Mover el grupo ${group.name}`}
             onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); onMove(e.key === 'ArrowUp' ? -1 : 1); } }}
-            sx={{ display: 'grid', placeItems: 'center', alignSelf: 'stretch', px: 0.25, mr: '-4px !important', borderRadius: 1, cursor: 'grab', color: 'text.disabled', '&:hover, &:focus-visible': { color: 'text.secondary', bgcolor: 'action.hover', outline: 'none' }, '&:active': { cursor: 'grabbing' } }}>
+            sx={{ display: 'grid', placeItems: 'center', alignSelf: 'stretch', px: 0.25, mr: -0.5, borderRadius: 1, cursor: 'grab', color: 'text.disabled', '&:hover, &:focus-visible': { color: 'text.secondary', bgcolor: 'action.hover', outline: 'none' }, '&:active': { cursor: 'grabbing' } }}>
             <DragIcon fontSize="small" />
           </Box>
         </Tooltip>
@@ -498,62 +501,69 @@ function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, op
             <ExpandIcon sx={{ transition: 'transform .2s', transform: open ? 'none' : 'rotate(-90deg)' }} />
           </IconButton>
         </Tooltip>
-        <Box sx={{ minWidth: 0, flexGrow: 1, cursor: 'pointer' }} onClick={onToggle}>
-          {/* Nombre del grupo y, a su derecha, el estado de un vistazo. */}
-          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
-            <Typography variant="h6" noWrap sx={{ minWidth: 0 }}>{group.name}</Typography>
+        <Box sx={{ minWidth: 0, maxWidth: { md: 340 }, flexShrink: 1, cursor: 'pointer', pr: 0.5 }} onClick={onToggle}>
+          {/* Nombre del grupo y, a su derecha, el estado de un vistazo. El entorno activo se ve en su botón (relleno). */}
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+            <Typography variant="h6" noWrap sx={{ minWidth: 0, fontSize: '1.05rem', lineHeight: 1.3 }}>{group.name}</Typography>
             {known && (summary.length
-              ? summary.map((x) => <Chip key={x.key} size="small" variant="outlined" color={x.color} label={`${x.n} ${x.text}`} sx={{ height: 20, fontSize: 11.5 }} />)
-              : <Chip size="small" variant="outlined" color="success" icon={<CheckIcon />} label="Todo al día" sx={{ height: 20, fontSize: 11.5 }} />)}
+              ? summary.map((x) => <Chip key={x.key} size="small" variant="outlined" color={x.color} label={`${x.n} ${x.text}`} sx={{ height: 20, fontSize: 11.5, flexShrink: 0 }} />)
+              : <Chip size="small" variant="outlined" color="success" icon={<CheckIcon />} label="Al día" sx={{ height: 20, fontSize: 11.5, flexShrink: 0 }} />)}
           </Stack>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" noWrap component="div">
             {group.repos.length} {group.repos.length === 1 ? 'repositorio' : 'repositorios'}
-            {activeIdx >= 0 && <> · Entorno activo: <b>{group.envs[activeIdx].name}</b></>}
             {partial && <> · {partial.env.name} parcial: {partial.diff} {partial.diff === 1 ? 'repo en otra rama' : 'repos en otra rama'}</>}
           </Typography>
         </Box>
-        {group.previous && (
-          <Tooltip title="Pone cada repositorio en la rama que tenía antes del último cambio de entorno">
-            <Button size="small" startIcon={<UndoIcon />} onClick={onRestore}>Volver al estado anterior</Button>
-          </Tooltip>
-        )}
-        {Object.entries(OPS).map(([op, o]) => (
-          <Tooltip key={op} title={o.title}><IconButton size="small" onClick={() => onRun(op)} aria-label={`${o.label} del grupo`}><o.Icon fontSize="small" /></IconButton></Tooltip>
-        ))}
-        <Tooltip title="Editar grupo"><IconButton size="small" onClick={onEditGroup}><EditIcon fontSize="small" /></IconButton></Tooltip>
-      </Stack>
 
-      <Stack {...envDrag.area} direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: open ? 1.5 : 0, pl: 1, transition: 'margin .2s' }}>
-        {envDrag.ordered.map((e) => {
-          const i = group.envs.indexOf(e);
-          const on = i === activeIdx;
-          const lost = missingIn(e);
-          const tip = lost.length
-            ? <>Ramas que ya no existen (ni en local ni en origin):{lost.map((id) => <div key={id}>· {repoName(id)}: {e.branches[id]}</div>)}</>
-            : on ? 'Entorno activo' : `Cambiar a ${e.name}`;
-          return (
-            <Tooltip key={e.id} title={envDrag.dragging ? '' : tip}>
-              <Chip {...envDrag.source(e.id)} {...envDrag.target(e.id)} clickable color={on ? 'primary' : lost.length ? 'warning' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : lost.length ? <WarningIcon /> : undefined}
-                label={e.name} onClick={() => onSwitch(e)} onDelete={() => onEditEnv(e)} deleteIcon={<EditIcon titleAccess="Editar entorno" />}
-                sx={{ fontWeight: 600, ...(partial?.env.id === e.id && { borderStyle: 'dashed', borderColor: 'primary.main' }), ...(envDrag.dragging === e.id && { opacity: 0.45 }) }} />
+        <Stack {...envDrag.area} direction="row" alignItems="center" flexWrap="wrap" useFlexGap
+          sx={{ gap: 0.75, flexGrow: 1, flexBasis: { xs: '100%', md: 0 }, minWidth: 0, order: { xs: 5, md: 0 }, pl: { xs: 1, md: 1.5 }, ml: { md: 0.5 }, borderLeft: { md: 1 }, borderColor: { md: 'divider' } }}>
+          {envDrag.ordered.map((e) => {
+            const i = group.envs.indexOf(e);
+            const on = i === activeIdx;
+            const lost = missingIn(e);
+            const tip = lost.length
+              ? <>Ramas que ya no existen (ni en local ni en origin):{lost.map((id) => <div key={id}>· {repoName(id)}: {e.branches[id]}</div>)}</>
+              : on ? 'Entorno activo' : `Cambiar a ${e.name}`;
+            return (
+              <Tooltip key={e.id} title={envDrag.dragging ? '' : tip}>
+                <Chip {...envDrag.source(e.id)} {...envDrag.target(e.id)} size="small" clickable color={on ? 'primary' : lost.length ? 'warning' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : lost.length ? <WarningIcon /> : undefined}
+                  label={e.name} onClick={() => onSwitch(e)} onDelete={() => onEditEnv(e)} deleteIcon={<EditIcon titleAccess="Editar entorno" />}
+                  sx={{ height: 28, px: 0.25, fontWeight: 600, '& .MuiChip-deleteIcon': { fontSize: 15, opacity: 0.7 }, ...(partial?.env.id === e.id && { borderStyle: 'dashed', borderColor: 'primary.main' }), ...(envDrag.dragging === e.id && { opacity: 0.45 }) }} />
+              </Tooltip>
+            );
+          })}
+          <Tooltip title="Nuevo entorno">
+            <Chip size="small" clickable variant="outlined" icon={<AddIcon />} label="Entorno" onClick={(ev) => setNewMenu(ev.currentTarget)}
+              sx={{ height: 28, borderStyle: 'dashed', color: 'text.secondary', bgcolor: 'transparent' }} />
+          </Tooltip>
+          <Menu anchorEl={newMenu} open={!!newMenu} onClose={() => setNewMenu(null)}>
+            <MenuItem onClick={() => { setNewMenu(null); onNewEnv({ branches: Object.fromEntries(group.repos.map((id) => [id, current[id] && !current[id].startsWith('(') ? current[id] : ''])) }); }}>
+              Con las ramas actuales
+            </MenuItem>
+            <MenuItem onClick={() => { setNewMenu(null); onNewEnv({}); }}>Vacío</MenuItem>
+            {group.envs.length > 0 && <Divider />}
+            {group.envs.map((e) => <MenuItem key={e.id} onClick={() => { setNewMenu(null); onNewEnv({ name: `${e.name} (copia)`, branches: e.branches }); }}>Duplicar {e.name}</MenuItem>)}
+          </Menu>
+        </Stack>
+
+        {/* Acciones del grupo: discretas hasta pasar el ratón por la tarjeta. */}
+        <Stack className="gm-actions" direction="row" alignItems="center" sx={{ ml: 'auto', opacity: { xs: 1, md: 0.55 }, transition: 'opacity .15s' }}>
+          {group.previous && (
+            <Tooltip title="Volver al estado anterior: pone cada repositorio en la rama que tenía antes del último cambio de entorno">
+              <IconButton size="small" color="primary" onClick={onRestore} aria-label="Volver al estado anterior"><UndoIcon fontSize="small" /></IconButton>
             </Tooltip>
-          );
-        })}
-        <Chip clickable variant="outlined" icon={<AddIcon />} label="Entorno" onClick={(ev) => setNewMenu(ev.currentTarget)} sx={{ borderStyle: 'dashed' }} />
-        <Menu anchorEl={newMenu} open={!!newMenu} onClose={() => setNewMenu(null)}>
-          <MenuItem onClick={() => { setNewMenu(null); onNewEnv({ branches: Object.fromEntries(group.repos.map((id) => [id, current[id] && !current[id].startsWith('(') ? current[id] : ''])) }); }}>
-            Con las ramas actuales
-          </MenuItem>
-          <MenuItem onClick={() => { setNewMenu(null); onNewEnv({}); }}>Vacío</MenuItem>
-          {group.envs.length > 0 && <Divider />}
-          {group.envs.map((e) => <MenuItem key={e.id} onClick={() => { setNewMenu(null); onNewEnv({ name: `${e.name} (copia)`, branches: e.branches }); }}>Duplicar {e.name}</MenuItem>)}
-        </Menu>
+          )}
+          {Object.entries(OPS).map(([op, o]) => (
+            <Tooltip key={op} title={o.title}><IconButton size="small" onClick={() => onRun(op)} aria-label={`${o.label} del grupo`}><o.Icon fontSize="small" /></IconButton></Tooltip>
+          ))}
+          <Tooltip title="Editar grupo"><IconButton size="small" onClick={onEditGroup} aria-label="Editar grupo"><EditIcon fontSize="small" /></IconButton></Tooltip>
+        </Stack>
       </Stack>
 
       {/* Tabla de 3 columnas: repositorio, rama actual y el entorno activo (o el que se elija en la cabecera para consultarlo).
           Así no crece a lo ancho aunque haya muchos entornos; las ramas que no coinciden se resaltan. */}
       <Collapse in={open} unmountOnExit>
-      <Box sx={{ ml: 1, overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+      <Box sx={{ ml: 1, mt: 1.25, overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
         <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 560, '& td, & th': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }}>
           <TableHead>
             <TableRow>
@@ -725,7 +735,7 @@ export default function Workspaces() {
           Luego cambias todos los repositorios de rama con un clic. También puedes crear un grupo desde <b>Repositorios locales</b> seleccionando varios.
         </Alert>
       )}
-      <Stack spacing={2} {...groupDrag.area}>
+      <Stack spacing={1.5} {...groupDrag.area}>
         {groupDrag.ordered.map((g) => (
           <GroupCard key={g.id} group={g}
             cardRef={(el) => { cardRefs.current[g.id] = el; }} handle={groupDrag.source(g.id, { get current() { return cardRefs.current[g.id]; } })}
