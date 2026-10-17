@@ -73,6 +73,7 @@ For apps made of several repositories, where each environment uses different bra
 - The group card shows the active environment and how many repositories drifted from it, plus a compact table: repository, current branch, and the active environment's branch. A drop-down in the column header shows any other environment without switching, and branches that differ from the current one are flagged.
 - Click a repository in the table to open its detail; going back returns to the work environments.
 - Cards can be collapsed to just the name, status and environment buttons (switching still takes one click). Each card remembers its state, and you can collapse or expand them all at once.
+- Drag a group by its handle (⋮⋮) to reorder the groups, or focus the handle and use the arrow keys. Drag the environment buttons to reorder them within a group. Groups are listed by name until you reorder them for the first time.
 - Switch from the command palette ("Portal → QA"). Each switch is recorded in the operation log.
 - **Group status at a glance:** each card shows how many repositories have uncommitted changes, commits to push or to pull, or "Todo al día". The table shows the same per repository (●changes ↑ahead ↓behind).
 - **Deleted branches are flagged:** an environment whose branch no longer exists locally or on origin shows a warning, with the affected repositories in its tooltip and "no existe" in the table, before you try to switch.

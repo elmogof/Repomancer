@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert, Autocomplete, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogContentText,
@@ -25,6 +25,7 @@ import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import FetchIcon from '@mui/icons-material/Sync';
 import PullIcon from '@mui/icons-material/Download';
 import PushIcon from '@mui/icons-material/Upload';
+import DragIcon from '@mui/icons-material/DragIndicator';
 import { api } from '../api/client.js';
 import { useNotify } from '../components/Notify.jsx';
 import { useCommands } from '../components/Commands.jsx';
@@ -37,6 +38,58 @@ let lastData = null;
 const COLLAPSED_KEY = 'gm-ws-collapsed';
 const storedCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]')); } catch { return new Set(); } };
 const saveCollapsed = (set) => { try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch { /* sin almacenamiento */ } };
+
+// Reordenar arrastrando (drag and drop del navegador) con vista previa en vivo: la lista se reordena
+// mientras se arrastra y, al soltar, onCommit recibe los ids en el nuevo orden. Esc cancela.
+// source(id) va en lo que se agarra y target(id) en cada elemento sobre el que se puede soltar.
+function useDragOrder(items, onCommit, axis = 'y') {
+  const [drag, setDrag] = useState(null); // { id, order, start }
+  const dropped = useRef(false); // se soltó dentro de la lista (si no, p. ej. con Esc, se deshace)
+  const order = drag ? drag.order : items.map((x) => x.id);
+  const ordered = order.map((id) => items.find((x) => x.id === id)).filter(Boolean);
+  const source = (id, image) => ({
+    draggable: true,
+    onDragStart: (e) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', id); } catch { /* algunos navegadores lo exigen */ }
+      const el = image?.current;
+      if (el) { const r = el.getBoundingClientRect(); e.dataTransfer.setDragImage(el, e.clientX - r.left, e.clientY - r.top); }
+      const ids = items.map((x) => x.id);
+      dropped.current = false;
+      setDrag({ id, order: ids, start: ids });
+    },
+    onDragEnd: () => {
+      const changed = drag && drag.order.join() !== drag.start.join();
+      if (changed && dropped.current) onCommit(drag.order);
+      setDrag(null);
+    },
+  });
+  const target = (id) => ({
+    onDragOver: (e) => {
+      if (!drag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (id === drag.id) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      const after = axis === 'y' ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
+      const from = drag.order.indexOf(drag.id);
+      const to = drag.order.indexOf(id);
+      // Solo se mueve al pasar la mitad del otro elemento, para que no salte de un lado a otro.
+      if ((from < to && !after) || (from > to && after)) return;
+      const next = drag.order.filter((x) => x !== drag.id);
+      next.splice(next.indexOf(id) + (after ? 1 : 0), 0, drag.id);
+      setDrag({ ...drag, order: next });
+    },
+    onDrop: (e) => { if (drag) { e.preventDefault(); dropped.current = true; } },
+  });
+  // El contenedor también acepta soltar en los huecos entre elementos (si no, el navegador lo daría por cancelado).
+  const area = {
+    onDragOver: (e) => { if (drag) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } },
+    onDrop: (e) => { if (drag) { e.preventDefault(); dropped.current = true; } },
+  };
+  return { ordered, source, target, area, dragging: drag?.id };
+}
 
 // Estado de cada entorno respecto a las ramas actuales: activo (todo coincide) o con N repos distintos.
 function envState(env, current) {
@@ -396,8 +449,9 @@ function SwitchDialog({ target, onClose, onDone }) {
 }
 
 // ---------- tarjeta de un grupo ----------
-function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore }) {
+function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, open, onToggle, onEditGroup, onEditEnv, onNewEnv, onSwitch, onRestore, onReorderEnvs, cardRef, handle, dropTarget, dragging, onMove }) {
   const [newMenu, setNewMenu] = useState(null);
+  const envDrag = useDragOrder(group.envs, (ids) => onReorderEnvs(ids.map((id) => group.envs.find((e) => e.id === id))), 'x');
   const states = group.envs.map((e) => envState(e, current));
   // Si varios entornos coinciden con las ramas actuales, se marca el último usado.
   const activeIdx = (() => {
@@ -429,8 +483,16 @@ function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, op
   const missingIn = (env) => group.repos.filter((id) => gone(env, id));
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+    <Paper ref={cardRef} variant="outlined" {...dropTarget} sx={{ p: { xs: 1.5, sm: 2 }, pl: { xs: 0.5, sm: 1 }, transition: 'opacity .15s', ...(dragging && { opacity: 0.45, borderStyle: 'dashed', borderColor: 'primary.main' }) }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+        {/* Asa para arrastrar el grupo (o moverlo con las flechas arriba y abajo cuando tiene el foco). */}
+        <Tooltip title="Arrastra para ordenar (o usa ↑ ↓)">
+          <Box {...handle} tabIndex={0} role="button" aria-label={`Mover el grupo ${group.name}`}
+            onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); onMove(e.key === 'ArrowUp' ? -1 : 1); } }}
+            sx={{ display: 'grid', placeItems: 'center', alignSelf: 'stretch', px: 0.25, mr: '-4px !important', borderRadius: 1, cursor: 'grab', color: 'text.disabled', '&:hover, &:focus-visible': { color: 'text.secondary', bgcolor: 'action.hover', outline: 'none' }, '&:active': { cursor: 'grabbing' } }}>
+            <DragIcon fontSize="small" />
+          </Box>
+        </Tooltip>
         <Tooltip title={open ? 'Contraer' : 'Expandir'}>
           <IconButton size="small" onClick={onToggle} aria-expanded={open} aria-label={open ? 'Contraer grupo' : 'Expandir grupo'}>
             <ExpandIcon sx={{ transition: 'transform .2s', transform: open ? 'none' : 'rotate(-90deg)' }} />
@@ -461,18 +523,19 @@ function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, op
         <Tooltip title="Editar grupo"><IconButton size="small" onClick={onEditGroup}><EditIcon fontSize="small" /></IconButton></Tooltip>
       </Stack>
 
-      <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: open ? 1.5 : 0, transition: 'margin .2s' }}>
-        {group.envs.map((e, i) => {
+      <Stack {...envDrag.area} direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: open ? 1.5 : 0, pl: 1, transition: 'margin .2s' }}>
+        {envDrag.ordered.map((e) => {
+          const i = group.envs.indexOf(e);
           const on = i === activeIdx;
           const lost = missingIn(e);
           const tip = lost.length
             ? <>Ramas que ya no existen (ni en local ni en origin):{lost.map((id) => <div key={id}>· {repoName(id)}: {e.branches[id]}</div>)}</>
             : on ? 'Entorno activo' : `Cambiar a ${e.name}`;
           return (
-            <Tooltip key={e.id} title={tip}>
-              <Chip clickable color={on ? 'primary' : lost.length ? 'warning' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : lost.length ? <WarningIcon /> : undefined}
+            <Tooltip key={e.id} title={envDrag.dragging ? '' : tip}>
+              <Chip {...envDrag.source(e.id)} {...envDrag.target(e.id)} clickable color={on ? 'primary' : lost.length ? 'warning' : 'default'} variant={on ? 'filled' : 'outlined'} icon={on ? <CheckIcon /> : lost.length ? <WarningIcon /> : undefined}
                 label={e.name} onClick={() => onSwitch(e)} onDelete={() => onEditEnv(e)} deleteIcon={<EditIcon titleAccess="Editar entorno" />}
-                sx={{ fontWeight: 600, ...(partial?.env.id === e.id && { borderStyle: 'dashed', borderColor: 'primary.main' }) }} />
+                sx={{ fontWeight: 600, ...(partial?.env.id === e.id && { borderStyle: 'dashed', borderColor: 'primary.main' }), ...(envDrag.dragging === e.id && { opacity: 0.45 }) }} />
             </Tooltip>
           );
         })}
@@ -490,7 +553,7 @@ function GroupCard({ group, current, state = {}, repoName, onOpenRepo, onRun, op
       {/* Tabla de 3 columnas: repositorio, rama actual y el entorno activo (o el que se elija en la cabecera para consultarlo).
           Así no crece a lo ancho aunque haya muchos entornos; las ramas que no coinciden se resaltan. */}
       <Collapse in={open} unmountOnExit>
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+      <Box sx={{ ml: 1, overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
         <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 560, '& td, & th': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }}>
           <TableHead>
             <TableRow>
@@ -587,12 +650,38 @@ export default function Workspaces() {
     const m = new Map((data?.repos || []).map((r) => [r.id, r.name]));
     return (id) => m.get(id) || '(quitado)';
   }, [data]);
-  const groups = useMemo(() => [...(data?.groups || [])].sort((a, b) => a.name.localeCompare(b.name, 'es')), [data]);
+  // El servidor devuelve los grupos en el orden guardado (por nombre hasta que se reordenen).
+  const groups = data?.groups || [];
   const openRepo = (id) => {
     if (data?.repos.find((r) => r.id === id)?.missing) notify('La carpeta de este repositorio ya no existe', 'warning');
     else navigate(`/repos/${id}`, { state: { from: '/workspaces' } });
   };
-  const replaceGroup = (g) => setData({ ...data, groups: [...data.groups.filter((x) => x.id !== g.id), g] });
+  // Reemplaza el grupo en su sitio; uno nuevo va al final.
+  const replaceGroup = (g) => {
+    const d = lastData || data;
+    setData({ ...d, groups: d.groups.some((x) => x.id === g.id) ? d.groups.map((x) => (x.id === g.id ? g : x)) : [...d.groups, g] });
+  };
+  const saveOrder = (ids) => {
+    const prev = lastData;
+    setData({ ...prev, groups: ids.map((id) => prev.groups.find((g) => g.id === id)) });
+    api.post('/workspaces/order', { ids }).catch((e) => { setData(prev); notify(e.message, 'error'); });
+  };
+  const groupDrag = useDragOrder(groups, saveOrder);
+  const cardRefs = useRef({});
+  const moveGroup = (id, delta) => {
+    const ids = groups.map((g) => g.id);
+    const i = ids.indexOf(id);
+    const j = i + delta;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    saveOrder(ids);
+    // Mantiene el foco en el asa del grupo movido, para seguir moviéndolo con las flechas.
+    setTimeout(() => cardRefs.current[id]?.querySelector('[role="button"][tabindex="0"]')?.focus(), 0);
+  };
+  const saveEnvOrder = (g, envs) => {
+    replaceGroup({ ...g, envs });
+    api.put(`/workspaces/${g.id}`, { envs }).then(replaceGroup).catch((e) => { replaceGroup(g); notify(e.message, 'error'); });
+  };
 
   useCommands('workspaces', () => [
     { id: 'ws:new', group: 'Entornos de trabajo', title: 'Nuevo grupo', run: () => setGroupDlg({}) },
@@ -636,9 +725,12 @@ export default function Workspaces() {
           Luego cambias todos los repositorios de rama con un clic. También puedes crear un grupo desde <b>Repositorios locales</b> seleccionando varios.
         </Alert>
       )}
-      <Stack spacing={2}>
-        {groups.map((g) => (
-          <GroupCard key={g.id} group={g} current={data.current} state={data.state} repoName={repoName} onOpenRepo={openRepo} onRun={(op) => setRunning({ group: g, op })} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
+      <Stack spacing={2} {...groupDrag.area}>
+        {groupDrag.ordered.map((g) => (
+          <GroupCard key={g.id} group={g}
+            cardRef={(el) => { cardRefs.current[g.id] = el; }} handle={groupDrag.source(g.id, { get current() { return cardRefs.current[g.id]; } })}
+            dropTarget={groupDrag.target(g.id)} dragging={groupDrag.dragging === g.id} onMove={(d) => moveGroup(g.id, d)}
+            onReorderEnvs={(envs) => saveEnvOrder(g, envs)} current={data.current} state={data.state} repoName={repoName} onOpenRepo={openRepo} onRun={(op) => setRunning({ group: g, op })} open={!collapsed.has(g.id)} onToggle={() => toggle(g.id)}
             onEditGroup={() => setGroupDlg({ group: g })}
             onEditEnv={(env) => setEnvDlg({ group: g, env })}
             onNewEnv={(seed) => setEnvDlg({ group: g, seed })}

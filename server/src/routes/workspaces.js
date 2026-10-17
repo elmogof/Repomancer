@@ -6,6 +6,8 @@
 // config.workspaces = [{ id, name, repos: [repoId], envs: [{ id, name, branches: { repoId: rama } }],
 //                        lastEnv, previous: { at, envId, branches } }]
 // Un repositorio sin rama en un entorno se deja como esté ("no cambiar").
+// El orden de los grupos y de sus entornos es el de las listas (se reordenan arrastrando en la pantalla).
+// Mientras no se haya reordenado nunca (config.workspacesOrdered), los grupos se muestran por nombre.
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -44,10 +46,13 @@ function sanitize(group) {
   return { ...group, name: cleanName(group.name, 'grupo'), repos, envs };
 }
 
-const groups = () => (load().workspaces || []).map((g) => {
-  const known = new Set(load().repos.map((x) => x.id));
-  return { ...g, repos: g.repos.filter((id) => known.has(id)) };
-});
+const byName = (a, b) => a.name.localeCompare(b.name, 'es');
+const groups = () => {
+  const c = load();
+  const known = new Set(c.repos.map((x) => x.id));
+  const list = (c.workspaces || []).map((g) => ({ ...g, repos: g.repos.filter((id) => known.has(id)) }));
+  return c.workspacesOrdered ? list : list.sort(byName);
+};
 
 function getGroup(id) {
   const g = groups().find((x) => x.id === id);
@@ -55,8 +60,13 @@ function getGroup(id) {
   return g;
 }
 
+// Guarda el grupo en su sitio; uno nuevo va al final.
 function saveGroup(g) {
-  update((c) => { c.workspaces = [...(c.workspaces || []).filter((x) => x.id !== g.id), g]; });
+  update((c) => {
+    const list = c.workspaces || [];
+    const i = list.findIndex((x) => x.id === g.id);
+    c.workspaces = i >= 0 ? list.map((x) => (x.id === g.id ? g : x)) : [...list, g];
+  });
 }
 
 async function pool(items, fn) {
@@ -103,6 +113,19 @@ r.post('/', (req, res) => {
   const g = sanitize({ id: crypto.randomUUID(), name: req.body?.name, repos: req.body?.repos, envs: req.body?.envs || [] });
   saveGroup(g);
   res.json(g);
+});
+
+// Nuevo orden de los grupos: ids en el orden deseado (los que falten conservan su orden relativo al final).
+r.post('/order', (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null;
+  if (!ids) throw bad('Falta el orden de los grupos');
+  update((c) => {
+    const list = c.workspacesOrdered ? [...(c.workspaces || [])] : [...(c.workspaces || [])].sort(byName);
+    const pos = (g) => { const i = ids.indexOf(g.id); return i < 0 ? ids.length : i; };
+    c.workspaces = list.map((g, i) => [g, i]).sort(([a, i], [b, j]) => pos(a) - pos(b) || i - j).map(([g]) => g);
+    c.workspacesOrdered = true;
+  });
+  res.json({ groups: groups().map((g) => g.id) });
 });
 
 r.put('/:id', (req, res) => {

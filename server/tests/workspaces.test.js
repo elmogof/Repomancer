@@ -43,6 +43,27 @@ const reset = () => {
 };
 
 describe('grupos y entornos', () => {
+  test('ordena los grupos: por nombre hasta reordenarlos, luego el orden guardado', async () => {
+    const before = (await srv.ok('GET', '/workspaces?status=0')).groups;
+    const zz = await srv.ok('POST', '/workspaces', { name: 'zz orden', repos: [ids.api] });
+    const aa = await srv.ok('POST', '/workspaces', { name: 'aa orden', repos: [ids.api] });
+    let names = (await srv.ok('GET', '/workspaces?status=0')).groups.map((g) => g.name);
+    assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'es')));
+    // zz primero; los demás conservan su orden detrás.
+    await srv.ok('POST', '/workspaces/order', { ids: [zz.id] });
+    let list = (await srv.ok('GET', '/workspaces?status=0')).groups;
+    assert.equal(list[0].id, zz.id);
+    // Editar un grupo no lo mueve; uno nuevo va al final.
+    await srv.ok('PUT', `/workspaces/${zz.id}`, { envs: [{ name: 'B', branches: {} }, { name: 'A', branches: {} }] });
+    const nu = await srv.ok('POST', '/workspaces', { name: 'mm orden', repos: [ids.api] });
+    list = (await srv.ok('GET', '/workspaces?status=0')).groups;
+    assert.equal(list[0].id, zz.id);
+    assert.deepEqual(list[0].envs.map((e) => e.name), ['B', 'A']);
+    assert.equal(list.at(-1).id, nu.id);
+    for (const g of [zz, aa, nu]) await srv.ok('DELETE', `/workspaces/${g.id}`);
+    assert.equal((await srv.ok('GET', '/workspaces?status=0')).groups.length, before.length);
+  });
+
   test('guarda una rama por repositorio y descarta repos desconocidos', async () => {
     const g = await srv.ok('POST', '/workspaces', {
       name: '  Portal  ', repos: [ids.api, ids.web, 'no-existe'],
