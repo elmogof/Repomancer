@@ -215,7 +215,7 @@ function NewBranchDialog({ open, base: initialBase, branches, onClose, onCreate 
   );
 }
 
-export default function Branches({ repoId, onChanged, act, onCompare, notify }) {
+export default function Branches({ repoId, version, onChanged, act, onCompare, notify }) {
   const [branches, setBranches] = useState([]);
   const [newFrom, setNewFrom] = useState(null); // rama base del diálogo de nueva rama; null = cerrado
   const [toDelete, setToDelete] = useState(null); // { name, force } rama local a eliminar
@@ -226,7 +226,8 @@ export default function Branches({ repoId, onChanged, act, onCompare, notify }) 
   const [searchOpts, setSearchOpts] = useSearchOptions('branches');
 
   const load = () => api.get(`/repos/${repoId}/branches`).then(setBranches).catch(() => {});
-  useEffect(() => { load(); }, [repoId]);
+  // version cambia tras cada operación del repositorio (fetch, pull, push…): así aparecen las ramas nuevas del remoto.
+  useEffect(() => { load(); }, [repoId, version]);
 
   const current = branches.find((b) => b.current);
   const done = async (r) => { await load(); onChanged(); return r; };

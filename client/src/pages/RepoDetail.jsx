@@ -486,7 +486,7 @@ export default function RepoDetail() {
           </Box>
         )}
         {tab === TAB.history && <History repoId={id} branch={st.branch} act={act} notify={notify} version={version} onUndo={() => undoCommit()} onTag={(c) => newTag(c)} onCompare={openCompare} />}
-        {tab === TAB.branches && <Branches repoId={id} onChanged={load} act={act} notify={notify} onCompare={openCompare} />}
+        {tab === TAB.branches && <Branches repoId={id} version={version} onChanged={load} act={act} notify={notify} onCompare={openCompare} />}
         {tab === TAB.compare && <Compare repoId={id} initial={compareInit} version={version} notify={notify} />}
         {tab === TAB.files && <FileHistory repoId={id} file={fileInit} version={version} notify={notify} />}
         {tab === TAB.stash && <Stashes repoId={id} act={act} version={version} onNew={() => setStashOpen(true)} />}
