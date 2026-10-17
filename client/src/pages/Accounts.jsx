@@ -71,8 +71,8 @@ export default function Accounts() {
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setError(null); setForm({ provider: 'github', url: 'https://github.com', token: '' }); }}>Añadir cuenta</Button>
       </Stack>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Con una cuenta, Git Manager usa su token para fetch, pull y push de los repos de ese servidor, y para gestionar merge requests (GitLab) o pull requests (GitHub).
-        Los tokens se guardan solo en tu equipo, en ~/.git-manager/config.json.
+        Con una cuenta, Repomancer usa su token para fetch, pull y push de los repos de ese servidor, y para gestionar merge requests (GitLab) o pull requests (GitHub).
+        Los tokens se guardan solo en tu equipo, en ~/.repomancer/config.json.
       </Typography>
       {!data ? <LinearProgress /> : (
         <Paper variant="outlined">

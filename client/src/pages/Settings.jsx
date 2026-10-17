@@ -132,7 +132,7 @@ export default function Settings({ mode, onToggleMode }) {
           <Button variant="outlined" startIcon={<AccountsIcon />} onClick={() => navigate('/accounts')}>Gestionar cuentas</Button>
         </Section>
 
-        <Section title="Datos" description="Dónde guarda Git Manager su configuración, los tokens y el registro de operaciones. Fuera del proyecto y nunca se sube a git.">
+        <Section title="Datos" description="Dónde guarda Repomancer su configuración, los tokens y el registro de operaciones. Fuera del proyecto y nunca se sube a git.">
           {server && (
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 13, wordBreak: 'break-all' }}>{server.configDir}</Typography>
@@ -140,7 +140,7 @@ export default function Settings({ mode, onToggleMode }) {
             </Stack>
           )}
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
-            Para que Git Manager arranque con Windows usa <Box component="code">npm run startup:install</Box> (ver el README).
+            Para que Repomancer arranque con Windows usa <Box component="code">npm run startup:install</Box> (ver el README).
           </Typography>
         </Section>
       </Stack>

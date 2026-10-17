@@ -1,6 +1,8 @@
-# Git Manager
+# Repomancer
 
-A local web app to manage all your Git repositories in one place, with built-in GitLab and GitHub integration. Clone, commit, branch, merge, resolve conflicts and review merge requests and pull requests from a single dashboard. It runs entirely on your own computer.
+<p align="center"><img src="docs/repomancer-logo.png" alt="Repomancer" width="480"></p>
+
+Repomancer (formerly Git Manager) is a local web app to manage all your Git repositories in one place, with built-in GitLab and GitHub integration. Clone, commit, branch, merge, resolve conflicts and review merge requests and pull requests from a single dashboard. It runs entirely on your own computer.
 
 - **Frontend:** React 18, Material UI 6 and Vite
 - **Backend:** Node.js and Express, running the real `git` on your machine
@@ -140,7 +142,6 @@ Also in the repository detail:
 - **Auto-fetch** runs in the background on all repositories (every 10 minutes by default; configurable or can be turned off) so the ↓ counts stay current.
 - The **operation log** records every Git operation (fetch, pull, push, commit, merge, branch deletion and so on) with its result and output.
 - A **Configuración** (settings) page gathers the theme, clone folder, pull mode, auto-fetch, the default work-environment switch options and the commit conventions, and shows where the app keeps its data.
-- Light and dark themes, a collapsible sidebar, a mobile-friendly layout, smooth screen transitions and loading placeholders.
 
 ## Requirements
 
@@ -152,8 +153,8 @@ Also in the repository detail:
 ## Installation
 
 ```bash
-git clone https://github.com/elmogof/Git-Manager-Local-Remote.git git-manager
-cd git-manager
+git clone https://github.com/elmogof/Git-Manager-Local-Remote.git repomancer
+cd repomancer
 npm install
 ```
 
@@ -188,8 +189,9 @@ npm run startup:install
 This command:
 
 - builds the client;
-- creates a Task Scheduler task named **Git Manager**, which starts the server with no window every time you sign in to Windows;
-- adds a **Git Manager** shortcut to the Start menu.
+- creates a Task Scheduler task named **Repomancer**, which starts the server with no window every time you sign in to Windows;
+- adds a **Repomancer** shortcut to the Start menu;
+- removes the old **Git Manager** task and shortcut, if you installed it before the rename.
 
 The server runs as your user, so "Open terminal", "Open in VS Code" and your Git credentials keep working. That is why it is a sign-in task and not a Windows service.
 
@@ -231,12 +233,12 @@ The login screen works the same way for both providers:
 ]
 ```
 
-You can also set them with the environment variables `GIT_MANAGER_GITLAB_CLIENT_ID` and `GIT_MANAGER_GITHUB_CLIENT_ID`.
+You can also set them with the environment variables `REPOMANCER_GITLAB_CLIENT_ID` and `REPOMANCER_GITHUB_CLIENT_ID`.
 
 **Creating the gitlab.com app** (once, by the maintainer):
 
 1. Sign in to gitlab.com and open **Edit profile → Applications** (<https://gitlab.com/-/user_settings/applications>), then click **Add new application**.
-2. **Name:** `Git Manager`. People see this name when they authorize the app.
+2. **Name:** `Repomancer`. People see this name when they authorize the app.
 3. **Redirect URI:** `http://localhost:4000/api/auth/oauth/callback`
 4. **Confidential:** unchecked.
 5. **Scopes:** `api`, `read_user`, `read_repository`, `write_repository`
@@ -245,7 +247,7 @@ You can also set them with the environment variables `GIT_MANAGER_GITLAB_CLIENT_
 **Creating the github.com app** (once, by the maintainer):
 
 1. Open **Settings → Developer settings → OAuth Apps → New OAuth App** (<https://github.com/settings/applications/new>).
-2. **Application name:** `Git Manager`. **Homepage URL:** your repository URL, for example `https://github.com/elmogof/Git-Manager-Local-Remote`.
+2. **Application name:** `Repomancer`. **Homepage URL:** your repository URL, for example `https://github.com/elmogof/Git-Manager-Local-Remote`.
 3. **Authorization callback URL:** `http://localhost:4000`. It isn't used by the device flow, but GitHub requires one.
 4. Click **Register application**, check **Enable Device Flow**, and click **Update application**.
 5. Copy the **Client ID** into `oauth-apps.json`. Don't generate a client secret; it isn't needed.
@@ -257,7 +259,7 @@ This uses GitLab's OAuth 2 with PKCE. The app sends you to your GitLab sign-in p
 You register the app once:
 
 1. In GitLab, open **Preferences → Applications** (`https://<your-gitlab>/-/user_settings/applications`) and click *Add new application*.
-2. **Name:** `Git Manager local`
+2. **Name:** `Repomancer local`
 3. **Redirect URI:** `http://localhost:4000/api/auth/oauth/callback`. If you use another port, change it to match.
 4. **Confidential:** unchecked. PKCE is used, so no secret is needed.
 5. **Scopes:** `api`, `read_user`, `read_repository`, `write_repository`
@@ -282,7 +284,7 @@ This uses GitHub's **device flow**, so there is no password, secret or callback 
 You register the app once:
 
 1. Open **Settings → Developer settings → OAuth Apps → New OAuth App** (<https://github.com/settings/applications/new>).
-2. **Application name:** `Git Manager local`. **Homepage URL** and **Authorization callback URL** can both be `http://localhost:4000`. They aren't used, but GitHub requires them.
+2. **Application name:** `Repomancer local`. **Homepage URL** and **Authorization callback URL** can both be `http://localhost:4000`. They aren't used, but GitHub requires them.
 3. Click **Register application**, then check **Enable Device Flow** and save.
 4. Paste the **Client ID** on the login screen. The client secret is not needed.
 
@@ -303,8 +305,10 @@ In **Cuentas** you can add more GitLab instances and GitHub accounts, each with 
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `4000` | Server port. The OAuth redirect URI changes with it (`http://localhost:<PORT>/api/auth/oauth/callback`). |
-| `GIT_MANAGER_HOME` | `~/.git-manager` | Folder for the configuration, operation log and server log |
-| `GIT_MANAGER_GITLAB_CLIENT_ID` / `GIT_MANAGER_GITHUB_CLIENT_ID` | from `oauth-apps.json` | Built-in OAuth app IDs for gitlab.com and github.com |
+| `REPOMANCER_HOME` | `~/.repomancer` | Folder for the configuration, operation log and server log |
+| `REPOMANCER_GITLAB_CLIENT_ID` / `REPOMANCER_GITHUB_CLIENT_ID` | from `oauth-apps.json` | Built-in OAuth app IDs for gitlab.com and github.com |
+
+The old names from before the rename (`GIT_MANAGER_HOME`, `GIT_MANAGER_GITLAB_CLIENT_ID`, `GIT_MANAGER_GITHUB_CLIENT_ID`) still work.
 | `CLIENT_URL` | `http://localhost:5173` in development, `http://localhost:<PORT>` in production | Where the GitLab OAuth callback sends you back |
 
 For example, with PowerShell:
@@ -315,7 +319,9 @@ $env:PORT = 5000; npm start
 
 ### Files
 
-All of these live in `GIT_MANAGER_HOME` (`C:\Users\<you>\.git-manager` on Windows), outside the project. They are never committed.
+All of these live in `REPOMANCER_HOME` (`C:\Users\<you>\.repomancer` on Windows), outside the project. They are never committed.
+
+If you used the app when it was called Git Manager, the first start moves your `.git-manager` folder to `.repomancer`, so your sessions, repositories and settings carry over.
 
 | File | Contents |
 |---|---|
@@ -354,19 +360,20 @@ Shortcuts without `Ctrl` or `Alt` only work when you're not typing in a field. `
 - **Tokens never land in your repos.** For hosts with a connected account, the token is passed to Git as an HTTP header through environment variables. It is never written to `.git/config` or into remote URLs. Other remotes use your usual Git credentials (SSH, Git Credential Manager…).
 - **Protection against other websites.** Every API call requires a custom header, so other web pages open in your browser can't send commands to the server.
 - **Passwords are never seen.** GitLab and GitHub sign-in happen on their own sites (OAuth with PKCE and the device flow).
-- **Nothing is deleted from disk.** Removing a repository from the list only removes it from Git Manager.
+- **Nothing is deleted from disk.** Removing a repository from the list only removes it from Repomancer.
 
 ## Project structure
 
 ```
-git-manager/
+repomancer/
 ├── package.json             # workspaces and top-level scripts
 ├── oauth-apps.json          # built-in public OAuth app IDs (gitlab.com, github.com)
 ├── scripts/startup/         # Windows sign-in task (startup.ps1, launch.mjs)
 ├── server/                  # Node + Express API
 │   └── src/
 │       ├── index.js         # server, CSRF check, static files
-│       ├── config.js        # local config in ~/.git-manager
+│       ├── config.js        # local config in ~/.repomancer
+│       ├── home.js          # data folder (moves the old ~/.git-manager)
 │       ├── git.js           # runs git and injects credentials
 │       ├── gitlab.js        # GitLab API, OAuth 2 + PKCE, multiple instances
 │       ├── github.js        # GitHub API client

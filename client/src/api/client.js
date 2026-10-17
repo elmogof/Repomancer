@@ -11,7 +11,7 @@ async function request(method, path, body) {
   const url = withInstance(path);
   const res = await fetch(`/api${url}`, {
     method,
-    headers: { 'X-Git-Manager': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { 'X-Repomancer': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));

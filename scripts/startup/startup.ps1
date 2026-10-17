@@ -1,4 +1,4 @@
-# Manages the "Git Manager" logon task: it starts the app's server, hidden, every time you sign in
+# Manages the "Repomancer" logon task: it starts the app's server, hidden, every time you sign in
 # to Windows, running as your own user (so terminals, editors and your git credentials work).
 #   install   build the client, create or update the task and start it
 #   uninstall stop and remove the task and the Start menu shortcut
@@ -6,7 +6,7 @@
 # Options for testing a second copy: -TaskName, -Port, -ConfigHome
 param(
   [Parameter(Position = 0)][ValidateSet('install', 'uninstall', 'start', 'stop', 'restart', 'status')][string]$Command = 'status',
-  [string]$TaskName = 'Git Manager',
+  [string]$TaskName = 'Repomancer',
   [int]$Port = 0,
   [string]$ConfigHome = ''
 )
@@ -30,7 +30,7 @@ function Show-Status {
   $task = Get-Task
   if (-not $task) { Write-Host "Task '$TaskName' is not installed."; return }
   Write-Host "Task '$TaskName': $($task.State)"
-  if (Test-Up) { Write-Host "App running at $url" } else { Write-Host "App is not responding at $url (log: server.log in your .git-manager folder)" }
+  if (Test-Up) { Write-Host "App running at $url" } else { Write-Host "App is not responding at $url (log: server.log in your .repomancer folder)" }
 }
 function Build-Client {
   Write-Host 'Building the client...'
@@ -40,11 +40,12 @@ function Build-Client {
 function Start-App {
   if (Test-Up) { Write-Warning "Port $appPort is already in use (is 'npm run dev' running?). Stop it, then run: npm run startup:start"; return }
   Start-ScheduledTask -TaskName $TaskName
-  if (Wait-Up) { Write-Host "Git Manager is running at $url" } else { Write-Warning "Started, but $url does not respond yet. Check server.log in your .git-manager folder." }
+  if (Wait-Up) { Write-Host "Repomancer is running at $url" } else { Write-Warning "Started, but $url does not respond yet. Check server.log in your .repomancer folder." }
 }
-function Stop-App {
-  $running = (Get-Task).State -eq 'Running'
-  if ($running) { Stop-ScheduledTask -TaskName $TaskName }
+function Stop-App([string]$Name = $TaskName) {
+  $task = Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
+  $running = $task.State -eq 'Running'
+  if ($running) { Stop-ScheduledTask -TaskName $Name }
   # Stopping the task only ends conhost: also end this project's launcher and the server it started.
   $launch = Join-Path $root 'scripts\startup\launch.mjs'
   $procs = Get-CimInstance Win32_Process -Filter "Name='node.exe'"
@@ -53,6 +54,18 @@ function Stop-App {
   $ids = @($ids | Where-Object { $_ })
   foreach ($id in $ids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
   if ($running -or $ids.Count) { Write-Host 'Stopped.' } else { Write-Host 'Not running.' }
+}
+
+# The app used to be called Git Manager: remove that task and its shortcut when installing the new one.
+function Remove-LegacyTask {
+  $legacy = 'Git Manager'
+  if ($TaskName -eq $legacy) { return }
+  if (Get-ScheduledTask -TaskName $legacy -ErrorAction SilentlyContinue) {
+    Stop-App $legacy
+    Unregister-ScheduledTask -TaskName $legacy -Confirm:$false
+    Write-Host "Removed the old '$legacy' task."
+  }
+  Remove-Item (Join-Path ([Environment]::GetFolderPath('Programs')) "$legacy.url") -ErrorAction SilentlyContinue
 }
 
 switch ($Command) {
@@ -68,9 +81,10 @@ switch ($Command) {
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
       -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
+    Remove-LegacyTask
     if (Get-Task) { Stop-App; Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
-      -Description "Starts the Git Manager server ($url) when you sign in. Project: $root" | Out-Null
+      -Description "Starts the Repomancer server ($url) when you sign in. Project: $root" | Out-Null
     Set-Content -Path $shortcut -Value "[InternetShortcut]`r`nURL=$url/`r`n" -Encoding ASCII
     Write-Host "Task '$TaskName' installed; it will start when you sign in. Start menu shortcut: $TaskName"
     Start-App

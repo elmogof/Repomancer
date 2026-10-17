@@ -1,10 +1,11 @@
-// Configuración local: se guarda FUERA del proyecto, en ~/.git-manager/config.json
+// Configuración local: se guarda FUERA del proyecto, en ~/.repomancer/config.json
 // (permisos 600). Aquí viven el token de GitLab y la lista de repositorios.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { appHome } from './home.js';
 
-export const CONFIG_DIR = process.env.GIT_MANAGER_HOME || path.join(os.homedir(), '.git-manager');
+export const CONFIG_DIR = appHome();
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const defaults = {

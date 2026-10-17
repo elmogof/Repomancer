@@ -383,7 +383,7 @@ export default function Repos() {
       <Dialog open={!!toRemove} onClose={() => setToRemove(null)} fullWidth maxWidth="sm">
         <DialogTitle>{toRemove?.length === 1 ? `¿Quitar «${toRemove[0].name}» de la lista?` : `¿Quitar ${toRemove?.length} repositorios de la lista?`}</DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: toRemove?.length > 1 ? 1.5 : 0 }}>Solo se quitan de Git Manager. Los archivos en disco <b>no</b> se borran.</Alert>
+          <Alert severity="info" sx={{ mb: toRemove?.length > 1 ? 1.5 : 0 }}>Solo se quitan de Repomancer. Los archivos en disco <b>no</b> se borran.</Alert>
           {toRemove?.length > 1 && (
             <Box component="ul" sx={{ m: 0, pl: 2.5, maxHeight: 240, overflow: 'auto', fontSize: 14 }}>
               {toRemove.map((r) => <li key={r.id}><b>{r.name}</b> <Typography component="span" variant="caption" color="text.secondary">{r.path}</Typography></li>)}

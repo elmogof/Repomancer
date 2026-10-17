@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Repomancer</title>
+  <rect width="64" height="64" rx="14" fill="#161D3A"/>
+  <rect x="20" y="33" width="24" height="23" rx="3.5" fill="#F4F2EC"/>
+  <g fill="none" stroke="#161D3A" stroke-width="2" stroke-linecap="round">
+    <line x1="28" y1="40.5" x2="28" y2="48.5"/>
+    <line x1="29.6" y1="40" x2="35" y2="44"/>
+    <circle cx="28" cy="38.5" r="2.2" fill="#F4F2EC"/>
+    <circle cx="28" cy="50.8" r="2.2" fill="#F4F2EC"/>
+    <circle cx="36.3" cy="45.6" r="2.2" fill="#F4F2EC"/>
+  </g>
+  <path d="M22 28 C26 20 30 12 36 8 C40 5.5 44.5 7.5 45.5 12 C43.5 10 40.5 10 39.5 13 C40.5 18 42.5 24 46 31 Z" fill="#5A4FE6"/>
+  <path d="M24.6 22.6 L42.3 25.6 L44 29 L23 25.8 Z" fill="#8F86F7"/>
+  <ellipse cx="33" cy="31" rx="20" ry="5" transform="rotate(9 33 31)" fill="#5A4FE6" stroke="#161D3A" stroke-width="1.2"/>
+  <path d="M52 15 L53.2 18.8 L57 20 L53.2 21.2 L52 25 L50.8 21.2 L47 20 L50.8 18.8 Z" fill="#FFFFFF"/>
+  <path d="M12 36 L12.9 38.6 L15.5 39.5 L12.9 40.4 L12 43 L11.1 40.4 L8.5 39.5 L11.1 38.6 Z" fill="#FFFFFF"/>
+</svg>

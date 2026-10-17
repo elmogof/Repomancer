@@ -1,5 +1,5 @@
 {
-  "name": "git-manager-server",
+  "name": "repomancer-server",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",

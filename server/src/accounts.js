@@ -1,6 +1,6 @@
 // Cuentas adicionales: otras instancias de GitLab y GitHub (github.com o GitHub Enterprise),
 // cada una con su token personal. La sesión principal de GitLab sigue en config.gitlab.
-// Los tokens se guardan en ~/.git-manager/config.json (permisos 600) y nunca se devuelven al cliente.
+// Los tokens se guardan en ~/.repomancer/config.json (permisos 600) y nunca se devuelven al cliente.
 import crypto from 'node:crypto';
 import { load, update } from './config.js';
 

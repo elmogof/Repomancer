@@ -10,7 +10,6 @@ import MergeIcon from '@mui/icons-material/CallMerge';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LogIcon from '@mui/icons-material/ReceiptLong';
 import AccountsIcon from '@mui/icons-material/ManageAccounts';
-import TreeIcon from '@mui/icons-material/AccountTree';
 import DarkIcon from '@mui/icons-material/DarkMode';
 import LightIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -141,10 +140,8 @@ export default function App({ mode, onToggleMode }) {
             <Tooltip title={mini ? 'Expandir menú' : 'Contraer menú'}>
               <IconButton edge="start" onClick={toggleNav} sx={{ mr: { xs: 0, sm: 1 } }} aria-label="Alternar menú lateral"><MenuIcon /></IconButton>
             </Tooltip>
-            <Box sx={{ width: 32, height: 32, mr: 1.5, borderRadius: 2, display: { xs: 'none', sm: 'grid' }, placeItems: 'center', color: '#fff', background: 'linear-gradient(135deg, #3399FF 0%, #0059B2 100%)', boxShadow: '0 2px 8px rgba(0, 114, 229, 0.4)' }}>
-              <TreeIcon fontSize="small" />
-            </Box>
-            <Typography variant="h6" noWrap sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>Git Manager</Typography>
+            <Box component="img" src="/repomancer.svg" alt="" sx={{ width: 34, height: 34, mr: 1.5, display: { xs: 'none', sm: 'block' }, borderRadius: '9px', boxShadow: '0 2px 8px rgba(22, 29, 58, 0.35)' }} />
+            <Typography variant="h6" noWrap sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>Repomancer</Typography>
             <Box sx={{ flexGrow: 1, display: { xs: 'block', sm: 'none' } }} />
             <RepoSearch />
             <Tooltip title="Paleta de comandos (Ctrl+Mayús+P)">

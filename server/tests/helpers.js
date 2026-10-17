@@ -1,5 +1,5 @@
 // Utilidades de las pruebas: repositorios desechables con su remoto y un servidor aislado
-// (puerto propio y GIT_MANAGER_HOME temporal), para no tocar nunca la configuración real.
+// (puerto propio y REPOMANCER_HOME temporal), para no tocar nunca la configuración real.
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -70,7 +70,7 @@ export async function startServer() {
   const child = spawn(process.execPath, ['src/index.js'], {
     cwd: SERVER_DIR, // Identidad fija: el stash automático necesita autor aunque el equipo no tenga git configurado.
     env: {
-      ...process.env, PORT: String(port), GIT_MANAGER_HOME: home,
+      ...process.env, PORT: String(port), REPOMANCER_HOME: home,
       GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com',
     }, stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -84,7 +84,7 @@ export async function startServer() {
   });
   const call = async (method, url, body) => {
     const res = await fetch(`http://127.0.0.1:${port}/api${url}`, {
-      method, headers: { 'X-Git-Manager': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
+      method, headers: { 'X-Repomancer': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json().catch(() => ({}));
     return { status: res.status, data };

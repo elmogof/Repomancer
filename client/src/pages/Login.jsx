@@ -19,7 +19,7 @@ export const GitLabLogo = ({ size = 18, className }) => (
 );
 
 const hostOf = (u) => { try { return new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).host.toLowerCase(); } catch { return ''; } };
-// Client ID de la aplicación incluida con Git Manager para ese servidor (gitlab.com / github.com), si existe.
+// Client ID de la aplicación incluida con Repomancer para ese servidor (gitlab.com / github.com), si existe.
 const builtinFor = (auth, provider, url) => {
   const apps = [auth.builtin?.[provider] || []].flat();
   return apps.find((a) => a.clientId && hostOf(a.url) === hostOf(url))?.clientId || '';
@@ -45,7 +45,7 @@ function GitLabLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
   const [url, setUrl] = useState(selfHosted ? auth.url : '');
   const [token, setToken] = useState('');
   const base = (selfHosted ? (/^https?:\/\//i.test(url) ? url : `https://${url}`) : GITLAB_COM).replace(/\/+$/, '');
-  // Application ID por defecto: el guardado para ese servidor tras iniciar sesión, o el incluido en Git Manager.
+  // Application ID por defecto: el guardado para ese servidor tras iniciar sesión, o el incluido en Repomancer.
   const stored = auth.gitlabClientIds?.[hostOf(base)] || '';
   const builtin = builtinFor(auth, 'gitlab', base);
   const [custom, setCustom] = useState(false);
@@ -88,13 +88,13 @@ function GitLabLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
           <Button variant="contained" size="large" startIcon={<GitLabLogo />} onClick={loginOAuth} disabled={busy || (selfHosted && !hostOf(url)) || (!useDefault && !clientId)}>Iniciar sesión con GitLab</Button>
           {(stored || builtin) && (
             <Link component="button" type="button" variant="body2" onClick={() => { setClientId(custom ? '' : stored); setCustom((c) => !c); }} sx={{ alignSelf: 'center' }}>
-              {custom ? (stored ? 'Usar el Application ID guardado' : 'Usar la aplicación incluida en Git Manager') : 'Usar otro Application ID'}
+              {custom ? (stored ? 'Usar el Application ID guardado' : 'Usar la aplicación incluida en Repomancer') : 'Usar otro Application ID'}
             </Link>
           )}
           {!useBuiltin && <Divider />}
           {!useBuiltin && <Steps title="Registro único de la aplicación en GitLab" open={help} onToggle={() => setHelp((h) => !h)}>
             <li>Abre <Link href={`${base}/-/user_settings/applications`} target="_blank" rel="noreferrer">Preferencias → Applications</Link>.</li>
-            <li>Nombre: <code>Git Manager local</code>.</li>
+            <li>Nombre: <code>Repomancer local</code>.</li>
             <li>Redirect URI: <code>{auth.oauthRedirect}</code></li>
             <li>Desmarca <b>Confidential</b>.</li>
             <li>Scopes: <code>{auth.oauthScopes}</code>.</li>
@@ -128,7 +128,7 @@ function GitHubLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
   const base = (enterprise ? url : 'https://github.com').replace(/\/+$/, '');
-  // Client ID por defecto: el propio guardado para ese servidor tras usarlo, o el incluido en Git Manager.
+  // Client ID por defecto: el propio guardado para ese servidor tras usarlo, o el incluido en Repomancer.
   const stored = auth.githubClientId && hostOf(auth.githubUrl) === hostOf(base) ? auth.githubClientId : '';
   const builtin = builtinFor(auth, 'github', base);
   const useBuiltin = !!(stored || builtin) && !custom;
@@ -182,7 +182,7 @@ function GitHubLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
           {device ? (
             <Stack spacing={1.5} alignItems="center" sx={(t) => ({ p: 2.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: alpha(t.palette.primary.main, 0.06) })}>
               <Typography variant="body2" color="text.secondary" textAlign="center">
-                Escribe este código en GitHub para autorizar a Git Manager{copied ? ' (ya está copiado)' : ''}:
+                Escribe este código en GitHub para autorizar a Repomancer{copied ? ' (ya está copiado)' : ''}:
               </Typography>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Typography sx={{ fontFamily: (t) => t.typography.fontFamilyCode, fontSize: 30, fontWeight: 700, letterSpacing: 4 }}>{device.userCode}</Typography>
@@ -199,13 +199,13 @@ function GitHubLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
           ) : (
             <>
               <Typography variant="body2" color="text.secondary">
-                Inicias sesión en GitHub con tu <b>usuario y contraseña</b> (y tu segundo factor, si lo tienes) y autorizas a Git Manager con un código. Esta app nunca ve tu contraseña.
+                Inicias sesión en GitHub con tu <b>usuario y contraseña</b> (y tu segundo factor, si lo tienes) y autorizas a Repomancer con un código. Esta app nunca ve tu contraseña.
               </Typography>
               {!useBuiltin && <TextField label="Client ID de la OAuth App" fullWidth value={clientId} onChange={(e) => setClientId(e.target.value)} helperText="Se obtiene una sola vez al registrar la aplicación en GitHub." />}
               <Button variant="contained" size="large" startIcon={<GitHubIcon />} onClick={start} disabled={busy || (!useBuiltin && !clientId)}>Iniciar sesión con GitHub</Button>
               {(stored || builtin) && (
                 <Link component="button" type="button" variant="body2" onClick={() => { setClientId(custom ? '' : stored); setCustom((c) => !c); }} sx={{ alignSelf: 'center' }}>
-                  {custom ? (stored ? 'Usar el Client ID guardado' : 'Usar la aplicación incluida en Git Manager') : 'Usar otro Client ID'}
+                  {custom ? (stored ? 'Usar el Client ID guardado' : 'Usar la aplicación incluida en Repomancer') : 'Usar otro Client ID'}
                 </Link>
               )}
             </>
@@ -213,7 +213,7 @@ function GitHubLogin({ auth, onLoggedIn, setError, busy, setBusy }) {
           {!useBuiltin && <Divider />}
           {!useBuiltin && <Steps title="Registro único de la aplicación en GitHub" open={help && !device} onToggle={() => setHelp((h) => !h)}>
             <li>Abre <Link href={`${base}/settings/applications/new`} target="_blank" rel="noreferrer">Settings → Developer settings → OAuth Apps → New</Link>.</li>
-            <li>Application name: <code>Git Manager local</code>.</li>
+            <li>Application name: <code>Repomancer local</code>.</li>
             <li>Homepage URL y Authorization callback URL: <code>{location.origin}</code> (no se usan, pero son obligatorias).</li>
             <li>Pulsa <b>Register application</b> y marca <b>Enable Device Flow</b>; guarda.</li>
             <li>Copia el <b>Client ID</b> aquí (no hace falta el secreto).</li>
@@ -248,7 +248,10 @@ export default function Login({ auth, onLoggedIn, embedded = false, only }) {
           <Typography variant="h5" gutterBottom>Conecta tu cuenta de {provider === 'github' ? 'GitHub' : 'GitLab'}</Typography>
         ) : (
           <>
-            <Typography variant="h4" gutterBottom><Box component="span" sx={{ color: 'primary.main' }}>Git</Box> Manager</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75, mb: 1.5 }}>
+              <Box component="img" src="/repomancer.svg" alt="" sx={{ width: 52, height: 52, borderRadius: '14px', boxShadow: '0 4px 14px rgba(22, 29, 58, 0.35)' }} />
+              <Typography variant="h4"><Box component="span" sx={{ color: 'primary.main' }}>Repo</Box>mancer</Typography>
+            </Box>
             <Typography color="text.secondary" sx={{ mb: 2 }}>Inicia sesión con tu cuenta de GitLab o de GitHub.</Typography>
           </>
         )}

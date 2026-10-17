@@ -82,11 +82,11 @@ export default function RepoQuickActions({ repo, onChanged, onRemoved }) {
       {btn('fav', repo.favorite ? <StarIcon fontSize="small" sx={{ color: 'warning.main' }} /> : <StarOutlineIcon fontSize="small" />,
         repo.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos', toggleFavorite, 'Los favoritos aparecen primero en la lista.')}
       {btn('labels', <LabelIcon fontSize="small" />, 'Etiquetas…', openLabels, 'Agrupa el repositorio por cliente, proyecto o equipo.')}
-      {btn('remove', <RemoveIcon fontSize="small" />, 'Quitar de la lista', () => setConfirmRemove(true), 'Solo se quita de Git Manager; los archivos en disco no se borran.', { color: 'error' })}
+      {btn('remove', <RemoveIcon fontSize="small" />, 'Quitar de la lista', () => setConfirmRemove(true), 'Solo se quita de Repomancer; los archivos en disco no se borran.', { color: 'error' })}
 
       <LabelsDialog open={labelsOpen} repos={[repo]} allLabels={allLabels} onClose={() => setLabelsOpen(false)} onSave={saveLabels} />
       <ConfirmDialog open={confirmRemove} title={`¿Quitar «${repo.name}» de la lista?`} confirm="Quitar" color="error"
-        body="Solo se quita de Git Manager. Los archivos en disco no se borran."
+        body="Solo se quita de Repomancer. Los archivos en disco no se borran."
         onClose={() => setConfirmRemove(false)} onConfirm={remove} />
     </Stack>
   );

@@ -1,5 +1,5 @@
 // Registro de operaciones: qué se ejecutó, sobre qué repositorio, cuándo y con qué resultado.
-// Se guarda en ~/.git-manager/oplog.json (últimas MAX entradas), fuera del proyecto.
+// Se guarda en ~/.repomancer/oplog.json (últimas MAX entradas), fuera del proyecto.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
